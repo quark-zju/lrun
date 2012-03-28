@@ -25,6 +25,8 @@ h1. Usage
 
 h1. Examples
 
+h2. Limit time
+
 <pre>
 % lrun --max-cpu-time 1.5 bash -c ':(){ :;};:' 3>&1
 MEMORY   10461184
@@ -46,3 +48,75 @@ EXITCODE 0
 TERMSIG  0
 EXCEED   REAL_TIME
 </pre>
+
+h2. Limit memory
+
+<pre>
+% lrun --max-memory 1000000 gedit 3>&1
+MEMORY   1000000
+CPUTIME  0.003
+REALTIME 0.020
+SIGNALED 0
+EXITCODE 0
+TERMSIG  0
+EXCEED   MEMORY
+</pre>
+
+h2. Restrict network
+
+<pre>
+% lrun --network true /sbin/ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 16436 qdisc noqueue state UNKNOWN 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP qlen 1000
+    link/ether 00:26:82:af:cf:75 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.3/24 brd 192.168.1.255 scope global wlan0
+    inet6 fe80::226:82ff:feaf:cf75/64 scope link 
+       valid_lft forever preferred_lft forever
+
+% lrun --network false /sbin/ip addr
+205: lo: <LOOPBACK> mtu 16436 qdisc noop state DOWN 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+</pre>
+
+h2. Isolate processes
+
+<pre>
+% lrun --isolate-process false bash -c 'echo $$'
+10140
+
+% lrun --isolate-process true bash -c 'echo $$'
+1
+</pre>
+
+h2. Change uid
+
+<pre>
+% lrun --uid 2000 /usr/bin/sudo ls
+sudo: unknown uid 2000: who are you?
+</pre>
+
+h2. Mount tmpfs
+
+<pre>
+% lrun ls /usr
+NX  bin  i486-mingw32  include	lib  lib32  local  man	sbin  share  src  x86_64-unknown-linux-gnu
+
+% lrun --tmpfs /usr 40960 df /usr
+Filesystem     1K-blocks  Used Available Use% Mounted on
+none                  40     0        40   0% /usr
+
+% lrun --tmpfs /tmp 0 touch /tmp/abc 3>&1
+touch: cannot touch `/tmp/abc': Read-only file system
+MEMORY   262144
+CPUTIME  0.001
+REALTIME 0.090
+SIGNALED 0
+EXITCODE 1
+TERMSIG  0
+EXCEED   none
+</pre>
+
