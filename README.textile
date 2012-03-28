@@ -1,0 +1,48 @@
+Execute commands on Linux with resources limited and show time, memory usage.
+
+h1. Dependencies
+
+* Linux kernel >= 2.6.26, you can check kernel config by @scripts/check_linux_config.rb@
+* g++, 4.4 should work, 4.6 and above recommended
+
+h1. Installation
+
+<pre>
+cd src
+make && sudo make install
+</pre>
+
+By default, lrun will be installed to @/usr/local/bin/lrun@.
+Use @PREFIX@ to specify a different location:
+
+<pre>
+PREFIX=/usr sudo -E make install
+</pre>
+
+h1. Usage
+
+<pre>lrun --help</pre>
+
+h1. Examples
+
+<pre>
+% lrun --max-cpu-time 1.5 bash -c ':(){ :;};:' 3>&1
+MEMORY   10461184
+CPUTIME  1.500
+REALTIME 1.507
+SIGNALED 0
+EXITCODE 0
+TERMSIG  0
+EXCEED   CPU_TIME
+</pre>
+
+<pre>
+% lrun --max-real-time 1.0 sleep 2 3>&1
+MEMORY   393216
+CPUTIME  0.001
+REALTIME 1.000
+SIGNALED 0
+EXITCODE 0
+TERMSIG  0
+EXCEED   REAL_TIME
+</pre>
