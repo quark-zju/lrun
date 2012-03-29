@@ -122,7 +122,8 @@ EXCEED   none
 
 h2. Verbose mode
 
-Setting %DEBUG=1% enables verbose mode:
+Setting @DEBUG=1@ enables verbose mode:
+
 <pre>
 % DEBUG=1 lrun --network true --reset-env false firefox
 </pre>
