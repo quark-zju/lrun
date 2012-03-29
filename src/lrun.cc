@@ -48,6 +48,7 @@ static struct {
     bool enable_network;
     bool enable_user_proc_namespace;
     useconds_t interval;
+    Cgroup* active_cgroup;
     
     std::map<std::string, std::string> cgroup_options;
 } config;
@@ -103,7 +104,7 @@ static void print_help() {
             "\n" \
             "Default options:\n" \
             "  lrun --network false --basic-devices true --isolate-process true \\\n" \
-            "       --reset-env true --interval 0.01 \\\n" \
+            "       --reset-env true --interval 0.05 \\\n" \
             "       --max-nprocess 300 --max-nfile 200 \\\n" \
             "       --min-nice 0 --max-rtprio 1 \\\n" \
             "       --uid $UID --gid $GID\n" \
@@ -123,7 +124,8 @@ static void parse_options(int argc, char * argv[]) {
     config.enable_devices_whitelist = true;
     config.enable_network = false;
     config.enable_user_proc_namespace = true;
-    config.interval = (useconds_t)(0.01 * 1000000);
+    config.interval = (useconds_t)(0.05 * 1000000);
+    config.active_cgroup = NULL;
 
     // arg settings
     config.arg.nice = 0;
@@ -249,8 +251,7 @@ static void parse_options(int argc, char * argv[]) {
 static void check_environment() {
     // require root
     if (geteuid() != 0 || setuid(0)) {
-        fprintf(stderr, "root required.\n");
-        exit(2);
+        FATAL("root required.");
     }
 
     // should not be in cgroup
@@ -264,8 +265,7 @@ static void check_environment() {
                     i = -1;
                     break;
                 default:
-                    fprintf(stderr, "can not run inside a cgroup.\n");
-                    exit(2);
+                    FATAL("can not run inside a cgroup.");
             }
         }
     }
@@ -281,6 +281,15 @@ static void clean_cg_exit(Cgroup& cg, int exit_code = 2) {
     if (cg.destroy()) WARNING("can not destroy cgroup");
     
     exit(exit_code);
+}
+
+static void signal_handler(int signal) {
+    fprintf(stderr, "Receive signal %d, exiting...\n", signal);
+    fflush(stderr);
+    if (config.active_cgroup) {
+        clean_cg_exit(*config.active_cgroup, 4);
+    }
+    exit(4);
 }
 
 
@@ -299,9 +308,9 @@ int main(int argc, char * argv[]) {
     Cgroup cg = Cgroup::create(group_name);
 
     if (!cg.valid()) FATAL("can not create cgroup '%s'", group_name.c_str());
+    config.active_cgroup = &cg;
 
     // assume cg is created just now and nobody has used it before.
-    
     // initialize settings
     // device limits
     if (config.enable_devices_whitelist) {
@@ -379,6 +388,17 @@ int main(int argc, char * argv[]) {
 
     // no sigpipe
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGALRM, SIG_IGN);
+
+    signal(SIGHUP, signal_handler);
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+    signal(SIGABRT, signal_handler);
+    signal(SIGQUIT, signal_handler);
+
+    signal(SIGFPE, signal_handler);
+    signal(SIGILL, signal_handler);
+    signal(SIGTRAP, signal_handler);
 
     // monitor its cpu_usage and real time usage and memory usage
     double start_time = now();
@@ -444,7 +464,7 @@ int main(int argc, char * argv[]) {
             }
         }
 
-        PROGRESS_INFO("CPU %4.2f | REAL %4.2f | MEM %4.2f",
+        PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2f",
                 cg.cpu_usage(), now() - start_time, cg.memory_usage() / 1.e6);
         // sleep for a while
         usleep(config.interval);
