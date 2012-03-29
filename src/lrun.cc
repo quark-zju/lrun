@@ -47,6 +47,7 @@ static struct {
     bool enable_devices_whitelist;
     bool enable_network;
     bool enable_user_proc_namespace;
+    useconds_t interval;
     
     std::map<std::string, std::string> cgroup_options;
 } config;
@@ -81,6 +82,7 @@ static void print_help() {
             "  --nice            nice           Add nice with specified value.\n" \
             "  --uid             uid            Set uid to specified uid (uid > 0).\n" \
             "  --gid             gid            Set gid to specified gid (gid > 0).\n" \
+            "  --interval        seconds        Set interval status update interval.\n" \
             "  --help                           Show this help.\n" \
             "\n" \
             "Options that could be used multiple times:\n" \
@@ -101,7 +103,7 @@ static void print_help() {
             "\n" \
             "Default options:\n" \
             "  lrun --network false --basic-devices true --isolate-process true \\\n" \
-            "       --reset-env true \\\n" \
+            "       --reset-env true --interval 0.01 \\\n" \
             "       --max-nprocess 300 --max-nfile 200 \\\n" \
             "       --min-nice 0 --max-rtprio 1 \\\n" \
             "       --uid $UID --gid $GID\n" \
@@ -121,6 +123,7 @@ static void parse_options(int argc, char * argv[]) {
     config.enable_devices_whitelist = true;
     config.enable_network = false;
     config.enable_user_proc_namespace = true;
+    config.interval = (useconds_t)(0.01 * 1000000);
 
     // arg settings
     config.arg.nice = 0;
@@ -205,6 +208,10 @@ static void parse_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             long long gid = NEXT_LONG_LONG_ARG;
             if (gid > 0) config.arg.gid = (gid_t)gid;
+        } else if (option == "interval") {
+            REQUIRE_NARGV(1);
+            useconds_t interval = (useconds_t)(NEXT_DOUBLE_ARG * 1000000);
+            if (interval > 0) config.interval = interval;
         } else if (option == "bindfs") {
             REQUIRE_NARGV(2);
             string dst = NEXT_STRING_ARG;
@@ -397,7 +404,7 @@ int main(int argc, char * argv[]) {
             // see what's wrong
             if (errno == ECHILD) {
                 // strangely, this happens at the beginning (?)
-                usleep(10);
+                usleep(config.interval);
             }
         }
 
@@ -440,7 +447,7 @@ int main(int argc, char * argv[]) {
         PROGRESS_INFO("CPU %4.2f | REAL %4.2f | MEM %4.2f",
                 cg.cpu_usage(), now() - start_time, cg.memory_usage() / 1.e6);
         // sleep for a while
-        usleep(20);
+        usleep(config.interval);
     }
 
     PROGRESS_INFO("\nOUT OF RUNNING LOOP\n");
