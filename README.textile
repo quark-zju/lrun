@@ -1,4 +1,4 @@
-Run command on Linux with resources limited and time / memory usage monitored.
+Run command on Linux with resources limited.
 
 h1. Dependencies
 

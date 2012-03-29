@@ -55,7 +55,7 @@ int DEBUG = 0;
 
 static void print_help() {
     fprintf(stderr,
-            "Execute commands on Linux with resources limited and show time, memory usage.\n" \
+            "Run command on Linux with resources limited.\n" \
             "\n" \
             "Usage: lrun [ options ] command-args 3>stat\n" \
             "\n" \
