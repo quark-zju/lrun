@@ -1,7 +1,7 @@
 BINARIES=lrun
 CXXFLAGS=-O2 -std=c++0x -Wall
 PREFIX?=/usr/local
-DEST=$(PREFIX)/bin/lrun
+INSTALL?=/bin/install -c -D
 
 .PHONY: all clean install
 
@@ -18,4 +18,4 @@ clean:
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 install: lrun
-	install -oroot -s -m6755 $^ $(DEST)
+	$(INSTALL) -m4555 -oroot -groot -s $< $(DESTDIR)$(PREFIX)/bin/lrun
