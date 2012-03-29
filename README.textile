@@ -12,12 +12,12 @@ cd src
 make && sudo make install
 </pre>
 
-By default, lrun will be installed to @/usr/local/bin/lrun@.
-Use @PREFIX@ to specify a different location:
+Archlinux users can install lrun from AUR:
 
 <pre>
-PREFIX=/usr sudo -E make install
+yaourt -S lrun
 </pre>
+
 
 h1. Usage
 
