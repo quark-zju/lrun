@@ -21,6 +21,7 @@
 # THE SOFTWARE.
 ################################################################################
 
+@no_problem = true
 @config = if File.exists? '/proc/config.gz'
             `zcat /proc/config.gz`
           else
@@ -34,8 +35,9 @@ if @config.empty?
 end
 
 def check name, config
-  status = (@config =~ /^#{config}=[ym]/) ? 'OK' : 'MISSING'
-  puts '%-12s: %s' % [name, status]
+  exists = (@config =~ /^#{config}=[ym]/)
+  @no_problem = false if not exists
+  puts '%-12s: %s' % [name, exists ? 'OK' : 'MISSING']
 end
 
 
@@ -49,4 +51,4 @@ check '    cpuacct',   'CONFIG_CGROUP_CPUACCT'
 check '    memory',    'CONFIG_CGROUP_MEM_RES_CTLR'
 check '    freezer',   'CONFIG_CGROUP_FREEZER'
 
-
+exit(@no_problem ? 0 : 1)
