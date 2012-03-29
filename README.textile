@@ -1,4 +1,4 @@
-Execute commands on Linux with resources limited and show time, memory usage.
+Run command on Linux with resources limited and time / memory usage monitored.
 
 h1. Dependencies
 
@@ -120,3 +120,9 @@ TERMSIG  0
 EXCEED   none
 </pre>
 
+h2. Verbose mode
+
+Setting %DEBUG=1% enables verbose mode:
+<pre>
+% DEBUG=1 lrun --network true --reset-env false firefox
+</pre>
