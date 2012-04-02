@@ -164,6 +164,7 @@ static void parse_options(int argc, char * argv[]) {
         }
 
         string option = argv[i] + 2;
+
         if (option == "max-cpu-time") {
             REQUIRE_NARGV(1);
             config.cpu_time_limit = NEXT_DOUBLE_ARG;
@@ -241,7 +242,10 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "help") {
             print_help();
         } else if (option == "version") {
-            print_help();
+            print_version();
+        } else if (option == "") {
+            config.arg.args = argv + i;
+            break;
         } else {
             fprintf(stderr, "Unknown option: '--%s'\nUse --help for information.\n", option.c_str());
             exit(1);
