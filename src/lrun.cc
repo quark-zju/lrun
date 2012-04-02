@@ -57,44 +57,45 @@ int DEBUG = 0;
 
 static void print_help() {
     fprintf(stderr,
-            "Run command on Linux with resources limited.\n" \
+            "Run command with resources limited.\n" \
             "\n" \
             "Usage: lrun [ options ] command-args 3>stat\n" \
             "\n" \
             "Options:\n" \
-            "  --max-cpu-time    seconds        Limit cpu time, seconds can be a float number.\n" \
-            "  --max-real-time   seconds        Limit real time, seconds can be a float number.\n" \
-            "  --max-memory      bytes          Limit memory (+swap) usage in bytes.\n" \
-            "                                   This value should not be too small (<100KB).\n" \
-            "  --max-nprocess    n              Set max number of tasks to n (n > 0).\n" \
-            "                                   Use this with --isolate-process true\n" \
-            "                                   Note: user namespace is not seperated,\n" \
-            "                                         Current user's processes are counted.\n" \
-            "  --min-nice        n              Set min nice to n (-20 <= n < 19).\n" \
-            "  --max-rtprio      n              Set max realtime priority to n.\n" \
-            "  --max-nfile       n              Set max number of file descriptors to n.\n" \
-            "  --max-stack       bytes          Set max stack size per process.\n" \
-            "  --isolate-process bool           Isolate pid, ipc namespace\n" \
-            "  --basic-devices   bool           Enable devices whitelist:\n" \
-            "                                   null, zero, full, random, urandom\n" \
-            "  --reset-env       bool           Clean environment variables.\n" \
-            "  --network         bool           Whether network access is permitted.\n" \
-            "  --chroot          path           Chroot to specified path before exec.\n" \
-            "  --nice            nice           Add nice with specified value.\n" \
-            "  --uid             uid            Set uid to specified uid (uid > 0).\n" \
-            "  --gid             gid            Set gid to specified gid (gid > 0).\n" \
-            "  --interval        seconds        Set interval status update interval.\n" \
-            "  --help                           Show this help.\n" \
+            "  --max-cpu-time    seconds     Limit cpu time, seconds can be a float number.\n" \
+            "  --max-real-time   seconds     Limit real time, seconds can be a float number.\n" \
+            "  --max-memory      bytes       Limit memory (+swap) usage in bytes.\n" \
+            "                                This value should not be too small (<100KB).\n" \
+            "  --max-nprocess    n           Set max number of tasks to n (n > 0).\n" \
+            "                                Use this with --isolate-process true\n" \
+            "                                Note: user namespace is not seperated,\n" \
+            "                                      Current user's processes are counted.\n" \
+            "  --min-nice        n           Set min nice to n (-20 <= n < 19).\n" \
+            "  --max-rtprio      n           Set max realtime priority to n.\n" \
+            "  --max-nfile       n           Set max number of file descriptors to n.\n" \
+            "  --max-stack       bytes       Set max stack size per process.\n" \
+            "  --isolate-process bool        Isolate pid, ipc namespace\n" \
+            "  --basic-devices   bool        Enable devices whitelist:\n" \
+            "                                null, zero, full, random, urandom\n" \
+            "  --reset-env       bool        Clean environment variables.\n" \
+            "  --network         bool        Whether network access is permitted.\n" \
+            "  --chroot          path        Chroot to specified path before exec.\n" \
+            "  --nice            nice        Add nice with specified value.\n" \
+            "  --uid             uid         Set uid to specified uid (uid > 0).\n" \
+            "  --gid             gid         Set gid to specified gid (gid > 0).\n" \
+            "  --interval        seconds     Set interval status update interval.\n" \
+            "  --help                        Show this help.\n" \
+            "  --version                     Show version information.\n" \
             "\n" \
             "Options that could be used multiple times:\n" \
-            "  --bindfs          dst src        Bind src path to dest path.\n" \
-            "                                   This is performed before chroot.\n" \
-            "  --tmpfs           path bytes     Mount writable tmpfs to specified path to hide\n" \
-            "                                   filesystem subtree. size is in bytes.\n" \
-            "                                   If bytes is 0, mount read-only.\n" \
-            "                                   This is performed after chroot.\n" \
-            "  --cgroup-option   key value      Apply cgroup setting before exec.\n" \
-            "  --env             key value      Set environment variable before exec.\n" \
+            "  --bindfs          dst src     Bind src path to dest path.\n" \
+            "                                This is performed before chroot.\n" \
+            "  --tmpfs           path bytes  Mount writable tmpfs to specified path to hide\n" \
+            "                                filesystem subtree. size is in bytes.\n" \
+            "                                If bytes is 0, mount read-only.\n" \
+            "                                This is performed after chroot.\n" \
+            "  --cgroup-option   key value   Apply cgroup setting before exec.\n" \
+            "  --env             key value   Set environment variable before exec.\n" \
             "\n" \
             "Return value:\n" \
             "  If lrun is unable to execute specified command, non-zero is returned and\n" \
@@ -109,10 +110,13 @@ static void print_help() {
             "       --min-nice 0 --max-rtprio 1 \\\n" \
             "       --uid $UID --gid $GID\n" \
             "\n" \
-            "lrun version " VERSION "\n" \
-            "Copyright (C) 2012 WU Jun <quark@zju.edu.cn>\n" \
-            "\n" \
            );
+    exit(0);
+}
+
+static void print_version() {
+    printf("lrun version " VERSION "\n" \
+           "Copyright (C) 2012 WU Jun <quark@zju.edu.cn>\n");
     exit(0);
 }
 
@@ -235,6 +239,8 @@ static void parse_options(int argc, char * argv[]) {
             string value = NEXT_STRING_ARG;
             config.arg.env_list.push_back(make_pair(key, value));
         } else if (option == "help") {
+            print_help();
+        } else if (option == "version") {
             print_help();
         } else {
             fprintf(stderr, "Unknown option: '--%s'\nUse --help for information.\n", option.c_str());
