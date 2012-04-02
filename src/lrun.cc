@@ -243,7 +243,8 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "version") {
             print_version();
         } else if (option == "") {
-            config.arg.args = argv + i;
+            if (i + 1 >= argc) print_help();
+            config.arg.args = argv + i + 1;
             break;
         } else {
             fprintf(stderr, "Unknown option: '--%s'\nUse --help for information.\n", option.c_str());
