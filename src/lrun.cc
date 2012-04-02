@@ -62,14 +62,13 @@ static void print_help() {
             "Usage: lrun [ options ] command-args 3>stat\n" \
             "\n" \
             "Options:\n" \
-            "  --max-cpu-time    seconds     Limit cpu time, seconds can be a float number.\n" \
-            "  --max-real-time   seconds     Limit real time, seconds can be a float number.\n" \
+            "  --max-cpu-time    seconds     Limit cpu time, seconds can be rational.\n" \
+            "  --max-real-time   seconds     Limit real time, seconds can be rational.\n" \
             "  --max-memory      bytes       Limit memory (+swap) usage in bytes.\n" \
-            "                                This value should not be too small (<100KB).\n" \
-            "  --max-nprocess    n           Set max number of tasks to n (n > 0).\n" \
-            "                                Use this with --isolate-process true\n" \
-            "                                Note: user namespace is not seperated,\n" \
-            "                                      Current user's processes are counted.\n" \
+            "                                This value should not be too small.\n" \
+            "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n" \
+            "                                is not seperated, current processes are\n" \
+            "                                counted. Set uid to resolve this issue.\n" \
             "  --min-nice        n           Set min nice to n (-20 <= n < 19).\n" \
             "  --max-rtprio      n           Set max realtime priority to n.\n" \
             "  --max-nfile       n           Set max number of file descriptors to n.\n" \
@@ -90,18 +89,18 @@ static void print_help() {
             "Options that could be used multiple times:\n" \
             "  --bindfs          dst src     Bind src path to dest path.\n" \
             "                                This is performed before chroot.\n" \
-            "  --tmpfs           path bytes  Mount writable tmpfs to specified path to hide\n" \
-            "                                filesystem subtree. size is in bytes.\n" \
+            "  --tmpfs           path bytes  Mount writable tmpfs to specified path to\n" \
+            "                                hide filesystem subtree. size is in bytes.\n" \
             "                                If bytes is 0, mount read-only.\n" \
             "                                This is performed after chroot.\n" \
             "  --cgroup-option   key value   Apply cgroup setting before exec.\n" \
             "  --env             key value   Set environment variable before exec.\n" \
             "\n" \
             "Return value:\n" \
-            "  If lrun is unable to execute specified command, non-zero is returned and\n" \
-            "  nothing will be written to fd 3.\n" \
-            "  Otherwise, lrun will return 0 and output time, memory usage, exit status\n" \
-            "  of executed command to fd 3.\n" \
+            "  - If lrun is unable to execute specified command, non-zero\n" \
+            "    is returned and nothing will be written to fd 3.\n" \
+            "  - Otherwise, lrun will return 0 and output time, memory usage,\n" \
+            "    exit status of executed command to fd 3.\n" \
             "\n" \
             "Default options:\n" \
             "  lrun --network false --basic-devices true --isolate-process true \\\n" \
