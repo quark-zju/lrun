@@ -337,23 +337,25 @@ static int clone_fn(void * clone_arg) {
     // nice
     if (arg.nice) nice(arg.nice);
 
-    // apply rlimit
+    // setup uid, gid
+    INFO("setgid %d, setuid %d", (int)arg.gid, (int)arg.uid);
+    if (setgid(arg.gid) || setuid(arg.uid)) {
+        FATAL("setgid(%d) or setuid(%d) failed", (int)arg.gid, (int)arg.uid);
+    }
+
+    // apply rlimit, note NPROC limit should be applied after setuid
     FOR_EACH(p, arg.rlimits) {
         int resource = p.first;
         rlimit limit;
         limit.rlim_cur = limit.rlim_max = p.second;
+
+        // wish to receive SIGXCPU to know it is TLE
         if (resource == RLIMIT_CPU) ++limit.rlim_max;
 
         INFO("setrlimit %d, [%d, %d]", resource, (int)limit.rlim_cur, (int)limit.rlim_max);
         if (setrlimit(resource, &limit)) {
             FATAL("can not set rlimit %d", resource);
         }
-    }
-
-    // setup uid, gid
-    INFO("setgid %d, setuid %d", (int)arg.gid, (int)arg.uid);
-    if (setgid(arg.gid) || setuid(arg.uid)) {
-        FATAL("setgid(%d) or setuid(%d) failed", (int)arg.gid, (int)arg.uid);
     }
 
     // prepare env
