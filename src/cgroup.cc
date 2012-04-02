@@ -309,7 +309,10 @@ static int clone_fn(void * clone_arg) {
         // skip . and ..
         if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
             int fd;
-            if (sscanf(name, "%d", &fd) == 1 && fd > 2 && fd != arg.sockets[0]) close(fd);
+            if (sscanf(name, "%d", &fd) == 1 && fd > 2 && fd != arg.sockets[0]) {
+                INFO("close %d", (int)fd);
+                close(fd);
+            }
         }
         free(namelist[i]);
     }
@@ -360,6 +363,7 @@ static int clone_fn(void * clone_arg) {
 
     // prepare env
     if (arg.reset_env) {
+        INFO("reset ENV");
         if (clearenv()) FATAL("can not clear env");
     }
 
@@ -430,6 +434,8 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     void * stack = (void*)((char*)alloca(stack_size) + stack_size);
     char buf[] = "RUN";
 
+    INFO("clone flags = 0x%x", (int)clone_flags);
+
     pid_t child_pid;
     child_pid = clone(clone_fn, stack, clone_flags, &arg);
 
@@ -437,6 +443,8 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         FATAL("clone failed");
         goto cleanup;
     }
+
+    INFO("child pid = %d", (int)child_pid);
 
     // attach child to current cgroup
     attach(child_pid);
@@ -460,7 +468,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         // Note: a process can enter D (uninterruptable sleep) status
         // when oom killer disabled, killing it requires re-enable oom killer
         // or enlarge memory limit
-        if (set("memory.oom_control", "1\n")) INFO("can not disable oom controller");
+        if (set("memory.oom_control", "1\n")) INFO("can not set memory.oom_control");
         goto cleanup;
     }
 
