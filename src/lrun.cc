@@ -237,8 +237,8 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "help") {
             print_help();
         } else {
-            fprintf(stderr, "Unknown option: --%s\n", option.c_str());
-            print_help();
+            fprintf(stderr, "Unknown option: '--%s'\nUse --help for information.\n", option.c_str());
+            exit(1);
         }
     }
 #undef REQUIRE_NARGV
