@@ -79,6 +79,7 @@ static void print_help() {
             "  --reset-env       bool        Clean environment variables.\n" \
             "  --network         bool        Whether network access is permitted.\n" \
             "  --chroot          path        Chroot to specified path before exec.\n" \
+            "  --chdir           path        Chdir to specified path after chroot.\n" \
             "  --nice            nice        Add nice with specified value.\n" \
             "  --uid             uid         Set uid to specified uid (uid > 0).\n" \
             "  --gid             gid         Set gid to specified gid (gid > 0).\n" \
@@ -135,6 +136,7 @@ static void parse_options(int argc, char * argv[]) {
     config.arg.uid = getuid() > 0 ? getuid() : (uid_t)2000;
     config.arg.gid = getgid() > 0 ? getgid() : (gid_t)200;
     config.arg.chroot_path = "";
+    config.arg.chdir_path = "";
     config.arg.args = argv + 1;
 
     // arg.rlimits settings
@@ -203,6 +205,9 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "chroot") {
             REQUIRE_NARGV(1);
             config.arg.chroot_path = NEXT_STRING_ARG;
+        } else if (option == "chdir") {
+            REQUIRE_NARGV(1);
+            config.arg.chdir_path = NEXT_STRING_ARG;
         } else if (option == "nice") {
             REQUIRE_NARGV(1);
             config.arg.nice = (int)NEXT_LONG_LONG_ARG;

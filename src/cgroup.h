@@ -170,6 +170,7 @@ namespace lrun {
                 int nice;                   // nice
                 int sockets[2];             // for sync between child and parent
                 std::string chroot_path;    // chroot path, empty if not need to chroot
+                std::string chdir_path;     // chdir path, empty if not need to chdir
                 std::list<std::pair<std::string, long long> > tmpfs_list;
                                             // [(dest, bytes)] mount tmpfs in child FS (after chroot)
                 std::list<std::pair<std::string, std::string> > bindfs_list; 
