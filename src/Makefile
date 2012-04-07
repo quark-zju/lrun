@@ -1,7 +1,7 @@
 BINARIES=lrun
 CXXFLAGS=-O2 -std=c++0x -Wall
 PREFIX?=/usr/local
-INSTALL?=/bin/install -c -D
+INSTALL?=/usr/bin/env install -c -D
 
 .PHONY: all clean install
 
