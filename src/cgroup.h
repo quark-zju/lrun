@@ -24,6 +24,7 @@
 
 #include <string>
 #include <map>
+#include <set>
 #include <list>
 #include <sys/resource.h>
 
@@ -177,6 +178,7 @@ namespace lrun {
                                             // [(dest, src)] mount bind in child FS (before chroot)
                 std::map<int, rlim_t> rlimits;
                                             // [resource, value] rlimit list
+                std::set<int> keep_fds;     // Do not close these fd
                 int reset_env;              // Do not inherit env
                 std::list<std::pair<std::string, std::string> > env_list;
                                             // environment variables whitelist

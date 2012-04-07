@@ -309,7 +309,7 @@ static int clone_fn(void * clone_arg) {
         // skip . and ..
         if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
             int fd;
-            if (sscanf(name, "%d", &fd) == 1 && fd > 2 && fd != arg.sockets[0]) {
+            if (sscanf(name, "%d", &fd) == 1 && fd > 2 && fd != arg.sockets[0] && arg.keep_fds.count(fd) == 0) {
                 INFO("close %d", (int)fd);
                 close(fd);
             }

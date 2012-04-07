@@ -96,6 +96,7 @@ static void print_help() {
             "                                This is performed after chroot.\n" \
             "  --cgroup-option   key value   Apply cgroup setting before exec.\n" \
             "  --env             key value   Set environment variable before exec.\n" \
+            "  --fd              n           Do not close fd n.\n" \
             "\n" \
             "Return value:\n" \
             "  - If lrun is unable to execute specified command, non-zero\n" \
@@ -243,6 +244,9 @@ static void parse_options(int argc, char * argv[]) {
             string key = NEXT_STRING_ARG;
             string value = NEXT_STRING_ARG;
             config.arg.env_list.push_back(make_pair(key, value));
+        } else if (option == "fd") {
+            REQUIRE_NARGV(1);
+            config.arg.keep_fds.insert((int)NEXT_LONG_LONG_ARG);
         } else if (option == "help") {
             print_help();
         } else if (option == "version") {
