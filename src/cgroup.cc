@@ -346,6 +346,10 @@ static int clone_fn(void * clone_arg) {
             FATAL("chdir '%s' failed", path.c_str());
         }
     }
+
+    // system commands
+    FOR_EACH(p, arg.cmd_list) system(p.c_str());
+
     // nice
     if (arg.nice) nice(arg.nice);
 

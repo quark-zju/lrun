@@ -97,6 +97,7 @@ static void print_help() {
             "  --cgroup-option   key value   Apply cgroup setting before exec.\n" \
             "  --env             key value   Set environment variable before exec.\n" \
             "  --fd              n           Do not close fd n.\n" \
+            "  --cmd             cmd         Execute system command after tmpfs mounted.\n" \
             "\n" \
             "Return value:\n" \
             "  - If lrun is unable to execute specified command, non-zero\n" \
@@ -247,6 +248,10 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "fd") {
             REQUIRE_NARGV(1);
             config.arg.keep_fds.insert((int)NEXT_LONG_LONG_ARG);
+        } else if (option == "cmd") {
+            REQUIRE_NARGV(1);
+            string cmd = NEXT_STRING_ARG;
+            config.arg.cmd_list.push_back(cmd);
         } else if (option == "help") {
             print_help();
         } else if (option == "version") {

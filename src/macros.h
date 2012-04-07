@@ -30,7 +30,7 @@
 # define _GNU_SOURCE 1
 #endif
 
-#define VERSION "0.9.3.3"
+#define VERSION "0.9.3.4"
 
 #include <cstdio>
 #include <cstdlib>
