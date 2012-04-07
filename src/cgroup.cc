@@ -318,16 +318,6 @@ static int clone_fn(void * clone_arg) {
     }
     if (namelist) free(namelist);
 
-    // chdir to a specified path
-    if (!arg.chdir_path.empty()) {
-        string& path = arg.chdir_path;
-
-        INFO("chdir %s", path.c_str());
-        if (chdir(path.c_str())) {
-            FATAL("chdir '%s' failed", path.c_str());
-        }
-    }
-
     // setup other tmpfs mounts
     FOR_EACH(p, arg.tmpfs_list) {
         const char * dest = p.first.c_str();
@@ -347,6 +337,15 @@ static int clone_fn(void * clone_arg) {
         }
     }
 
+    // chdir to a specified path
+    if (!arg.chdir_path.empty()) {
+        string& path = arg.chdir_path;
+
+        INFO("chdir %s", path.c_str());
+        if (chdir(path.c_str())) {
+            FATAL("chdir '%s' failed", path.c_str());
+        }
+    }
     // nice
     if (arg.nice) nice(arg.nice);
 
