@@ -398,23 +398,22 @@ static int clone_fn(void * clone_arg) {
     // not closing sockets[0] here, it will closed on exec
     // if exec fails, it will be closed upon process exit (aka. this function returns)
 
-
     // exec target
-    execvp((arg.args)[0], arg.args);
+    execvp(arg.args[0], arg.args);
 
     // exec failed, store errno
     int last_err = errno;
 
-    // wait parent
-    read(arg.sockets[0], buf, sizeof buf);
-
     // output to stderr
     errno = last_err;
-    ERROR("exec failed");
+    ERROR("exec '%s' failed", arg.args[0]);
 
     // notify parent that exec failed
     strcpy(buf, "ERR");
     write(arg.sockets[0], buf, sizeof buf);
+
+    // wait parent
+    read(arg.sockets[0], buf, sizeof buf);
 
     exit(-1);
     return -1;
@@ -474,24 +473,17 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         goto cleanup;
     }
 
-    // successful exec, now write will just fails
-    // SIGPIPE should be ignored here
-    signal(SIGPIPE, SIG_IGN);
-    if (write(arg.sockets[1], buf, sizeof buf) == -1) {
+    // child exec may fail, confirm
+    if (read(arg.sockets[1], buf, sizeof buf) > 0 && buf[0] == 'E') {
+        child_pid = -3;
+    } else {
         // disable oom killer now
         // oom killer writes a super long log, disable it
         // Note: a process can enter D (uninterruptable sleep) status
         // when oom killer disabled, killing it requires re-enable oom killer
         // or enlarge memory limit
         if (set("memory.oom_control", "1\n")) INFO("can not set memory.oom_control");
-        goto cleanup;
     }
-
-    // child exec fail, confirm
-    read(arg.sockets[1], buf, sizeof buf);
-
-    // child exec failed ?
-    if (buf[0] == 'E') child_pid = -3;
 
 cleanup:
     close(arg.sockets[1]);
