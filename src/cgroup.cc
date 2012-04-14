@@ -474,7 +474,9 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         goto cleanup;
     }
 
-    // successful exec
+    // successful exec, now write will just fails
+    // SIGPIPE should be ignored here
+    signal(SIGPIPE, SIG_IGN);
     if (write(arg.sockets[1], buf, sizeof buf) == -1) {
         // disable oom killer now
         // oom killer writes a super long log, disable it
