@@ -1,16 +1,16 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Copyright (C) 2012 WU Jun <quark@zju.edu.cn>
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -24,7 +24,6 @@
 #include <cstdio>
 #include <cstring>
 #include <cerrno>
-#include <cstdlib>
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -36,6 +35,8 @@ namespace fs = lrun::fs;
 using std::string;
 
 const char * const fs::MOUNTS_PATH = "/proc/mounts";
+const char * const fs::TYPE_CGROUP = "cgroup";
+const char * const fs::TYPE_TMPFS  = "tmpfs";
 
 int fs::write(const string& path, const string& content) {
     FILE* fp = fopen(path.c_str(), "w");
@@ -72,7 +73,7 @@ int fs::is_dir(const string& path) {
 }
 
 int fs::mkdir_p(const string& dir, const mode_t mode) {
-    // do nothing if directory exists 
+    // do nothing if directory exists
     if (is_dir(dir)) return 0;
 
     // make each dirs
@@ -92,7 +93,7 @@ int fs::mkdir_p(const string& dir, const mode_t mode) {
 
 int fs::rm_rf(const string& path) {
     // TODO use more efficient implement like coreutils/rm
-    
+
     // try to remove single file or an empty dir
     if (unlink(path.c_str()) == 0) return 0;
     if (rmdir(path.c_str()) == 0) return 0;
@@ -122,7 +123,7 @@ int fs::chmod(const std::string& path, const mode_t mode) {
 }
 
 int fs::mount_bind(const string& src, const string& dest) {
-    int e = mount(src.c_str(), 
+    int e = mount(src.c_str(),
                   dest.c_str(),
                   NULL,
                   MS_BIND | MS_NOSUID,
@@ -137,9 +138,9 @@ int fs::mount_tmpfs(const string& dest, size_t max_size, mode_t mode) {
     char tmpfs_opts[256];
     snprintf(tmpfs_opts, sizeof tmpfs_opts, "size=%lu,mode=0%o", (unsigned long)max_size, (unsigned int)mode);
 
-    return mount(NULL, 
+    return mount(NULL,
                  dest.c_str(),
-                 "tmpfs",
+                 TYPE_TMPFS,
                  MS_NOSUID | MS_NODEV,
                  tmpfs_opts);
 }

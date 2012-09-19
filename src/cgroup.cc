@@ -1,16 +1,16 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Copyright (C) 2012 WU Jun <quark@zju.edu.cn>
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -49,22 +49,25 @@ string Cgroup::base_path(bool create_on_need) {
     if (!last_base_path.empty() && fs::is_dir(last_base_path)) return last_base_path;
 
     // enumerate mounts
+    std::map<string, string> mounts;
     FILE *fp = setmntent(fs::MOUNTS_PATH, "r");
     if (!fp) return "";
 
+    // no cgroups mounted, prepare one
+    const char * MNT_SRC_NAME = "cgroup_lrun";
+    const char * MNT_DEST_BASE_PATH = "/sys/fs/cgroup";
+    const char * MNT_DEST_PATH = "/sys/fs/cgroup/lrun";
+
     for (struct mntent *ent; (ent = getmntent(fp));) {
-        if (strcmp(ent->mnt_type, "cgroup") == 0) {
+        mounts[string(ent->mnt_dir)] = string(ent->mnt_type);
+        if (strcmp(ent->mnt_type, fs::TYPE_CGROUP) == 0 && strcmp(ent->mnt_fsname, MNT_SRC_NAME) == 0) {
+            INFO("last_base_path = '%s'", ent->mnt_dir);
             fclose(fp);
             return (last_base_path = string(ent->mnt_dir));
         }
     }
 
     if (!create_on_need) return "";
-
-    // no cgroups mounted, prepare one
-    const char * MNT_SRC_NAME = "cgroup_lrun";
-    const char * MNT_DEST_BASE_PATH = "/sys/fs/cgroup";
-    const char * MNT_DEST_PATH = "/sys/fs/cgroup/lrun";
 
     if (!fs::is_dir(MNT_DEST_BASE_PATH)) {
         // no /sys/fs/cgroup in system, try conservative location
@@ -74,22 +77,29 @@ string Cgroup::base_path(bool create_on_need) {
     }
 
     // prepare tmpfs on MNT_DEST_BASE_PATH
-    int e = mount(NULL, MNT_DEST_BASE_PATH, "tmpfs", MS_NOEXEC | MS_NOSUID, "size=16384,mode=0755");
-    if (e != 0) FATAL("can not mount tmpfs on '%s'", MNT_DEST_BASE_PATH);
+    int dest_base_mounted = 0;
+    if (mounts.count(string(MNT_DEST_BASE_PATH)) == 0) {
+        int e = mount(NULL, MNT_DEST_BASE_PATH, fs::TYPE_TMPFS, MS_NOEXEC | MS_NOSUID, "size=16384,mode=0755");
+        if (e != 0) FATAL("can not mount tmpfs on '%s'", MNT_DEST_BASE_PATH);
+        dest_base_mounted = 1;
+    } else {
+        INFO("'%s' is already mounted, skip mounting tmpfs", MNT_DEST_BASE_PATH);
+    }
 
     // create and mount cgroup at MNT_DEST_BASE_PATH
+    INFO("mkdir and mounting '%s'", MNT_DEST_PATH);
     mkdir(MNT_DEST_PATH, 0700);
-    e = mount(MNT_SRC_NAME, MNT_DEST_PATH, "cgroup", MS_NOEXEC | MS_NOSUID, "cpuacct,memory,devices,freezer");
+    int e = mount(MNT_SRC_NAME, MNT_DEST_PATH, fs::TYPE_CGROUP, MS_NOEXEC | MS_NOSUID, "cpuacct,memory,devices,freezer");
 
     if (e != 0) {
         int last_err = errno;
-        // fallback, umount tmpfs
-        umount(MNT_DEST_BASE_PATH);
+        // fallback, umount tmpfs if it is just mounted
+        if (dest_base_mounted) umount(MNT_DEST_BASE_PATH);
         errno = last_err;
         FATAL("can not mount cgroup on '%s'", MNT_DEST_BASE_PATH);
     }
 
-    return (last_base_path = MNT_DEST_PATH);
+    return (last_base_path = string(MNT_DEST_PATH));
 }
 
 string Cgroup::path_from_name(const string& name) {
@@ -108,7 +118,7 @@ Cgroup Cgroup::create(const string& name) {
     if (fs::is_dir(path)) {
         cg.path_ = path;
         return cg;
-    } 
+    }
 
     // not existed, create new
     if (mkdir(path.c_str(), 0700) == 0) cg.path_ = path;

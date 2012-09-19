@@ -1,16 +1,16 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Copyright (C) 2012 WU Jun <quark@zju.edu.cn>
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -50,7 +50,7 @@ static struct {
     bool enable_user_proc_namespace;
     useconds_t interval;
     Cgroup* active_cgroup;
-    
+
     std::map<std::string, std::string> cgroup_options;
 } config;
 
@@ -58,67 +58,67 @@ int DEBUG = 0;
 
 static void print_help() {
     fprintf(stderr,
-            "Run command with resources limited.\n" \
-            "\n" \
-            "Usage: lrun [ options ] command-args 3>stat\n" \
-            "\n" \
-            "Options:\n" \
-            "  --max-cpu-time    seconds     Limit cpu time, seconds can be rational.\n" \
-            "  --max-real-time   seconds     Limit real time, seconds can be rational.\n" \
-            "  --max-memory      bytes       Limit memory (+swap) usage in bytes.\n" \
-            "                                This value should not be too small.\n" \
-            "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n" \
-            "                                is not seperated, current processes are\n" \
-            "                                counted. Set uid to resolve this issue.\n" \
-            "  --min-nice        n           Set min nice to n (-20 <= n < 19).\n" \
-            "  --max-rtprio      n           Set max realtime priority to n.\n" \
-            "  --max-nfile       n           Set max number of file descriptors to n.\n" \
-            "  --max-stack       bytes       Set max stack size per process.\n" \
-            "  --isolate-process bool        Isolate pid, ipc namespace\n" \
-            "  --basic-devices   bool        Enable devices whitelist:\n" \
-            "                                null, zero, full, random, urandom\n" \
-            "  --reset-env       bool        Clean environment variables.\n" \
-            "  --network         bool        Whether network access is permitted.\n" \
-            "  --chroot          path        Chroot to specified path before exec.\n" \
-            "  --chdir           path        Chdir to specified path after chroot.\n" \
-            "  --nice            nice        Add nice with specified value.\n" \
-            "  --uid             uid         Set uid to specified uid (uid > 0).\n" \
-            "  --gid             gid         Set gid to specified gid (gid > 0).\n" \
-            "  --interval        seconds     Set interval status update interval.\n" \
-            "  --help                        Show this help.\n" \
-            "  --version                     Show version information.\n" \
-            "\n" \
-            "Options that could be used multiple times:\n" \
-            "  --bindfs          dst src     Bind src path to dest path.\n" \
-            "                                This is performed before chroot.\n" \
-            "  --tmpfs           path bytes  Mount writable tmpfs to specified path to\n" \
-            "                                hide filesystem subtree. size is in bytes.\n" \
-            "                                If bytes is 0, mount read-only.\n" \
-            "                                This is performed after chroot.\n" \
-            "  --cgroup-option   key value   Apply cgroup setting before exec.\n" \
-            "  --env             key value   Set environment variable before exec.\n" \
-            "  --fd              n           Do not close fd n.\n" \
-            "  --cmd             cmd         Execute system command after tmpfs mounted.\n" \
-            "\n" \
-            "Return value:\n" \
-            "  - If lrun is unable to execute specified command, non-zero\n" \
-            "    is returned and nothing will be written to fd 3.\n" \
-            "  - Otherwise, lrun will return 0 and output time, memory usage,\n" \
-            "    exit status of executed command to fd 3.\n" \
-            "\n" \
-            "Default options:\n" \
-            "  lrun --network false --basic-devices true --isolate-process true \\\n" \
-            "       --reset-env true --interval 0.05 \\\n" \
-            "       --max-nprocess 300 --max-nfile 200 \\\n" \
-            "       --min-nice 0 --max-rtprio 1 \\\n" \
-            "       --uid $UID --gid $GID\n" \
-            "\n" \
+            "Run command with resources limited.\n"
+            "\n"
+            "Usage: lrun [ options ] command-args 3>stat\n"
+            "\n"
+            "Options:\n"
+            "  --max-cpu-time    seconds     Limit cpu time, seconds can be rational.\n"
+            "  --max-real-time   seconds     Limit real time, seconds can be rational.\n"
+            "  --max-memory      bytes       Limit memory (+swap) usage in bytes.\n"
+            "                                This value should not be too small.\n"
+            "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n"
+            "                                is not seperated, current processes are\n"
+            "                                counted. Set uid to resolve this issue.\n"
+            "  --min-nice        n           Set min nice to n (-20 <= n < 19).\n"
+            "  --max-rtprio      n           Set max realtime priority to n.\n"
+            "  --max-nfile       n           Set max number of file descriptors to n.\n"
+            "  --max-stack       bytes       Set max stack size per process.\n"
+            "  --isolate-process bool        Isolate pid, ipc namespace\n"
+            "  --basic-devices   bool        Enable devices whitelist:\n"
+            "                                null, zero, full, random, urandom\n"
+            "  --reset-env       bool        Clean environment variables.\n"
+            "  --network         bool        Whether network access is permitted.\n"
+            "  --chroot          path        Chroot to specified path before exec.\n"
+            "  --chdir           path        Chdir to specified path after chroot.\n"
+            "  --nice            nice        Add nice with specified value.\n"
+            "  --uid             uid         Set uid to specified uid (uid > 0).\n"
+            "  --gid             gid         Set gid to specified gid (gid > 0).\n"
+            "  --interval        seconds     Set interval status update interval.\n"
+            "  --help                        Show this help.\n"
+            "  --version                     Show version information.\n"
+            "\n"
+            "Options that could be used multiple times:\n"
+            "  --bindfs          dst src     Bind src path to dest path.\n"
+            "                                This is performed before chroot.\n"
+            "  --tmpfs           path bytes  Mount writable tmpfs to specified path to\n"
+            "                                hide filesystem subtree. size is in bytes.\n"
+            "                                If bytes is 0, mount read-only.\n"
+            "                                This is performed after chroot.\n"
+            "  --cgroup-option   key value   Apply cgroup setting before exec.\n"
+            "  --env             key value   Set environment variable before exec.\n"
+            "  --fd              n           Do not close fd n.\n"
+            "  --cmd             cmd         Execute system command after tmpfs mounted.\n"
+            "\n"
+            "Return value:\n"
+            "  - If lrun is unable to execute specified command, non-zero\n"
+            "    is returned and nothing will be written to fd 3.\n"
+            "  - Otherwise, lrun will return 0 and output time, memory usage,\n"
+            "    exit status of executed command to fd 3.\n"
+            "\n"
+            "Default options:\n"
+            "  lrun --network false --basic-devices true --isolate-process true \\\n"
+            "       --reset-env true --interval 0.05 \\\n"
+            "       --max-nprocess 2048 --max-nfile 256 \\\n"
+            "       --min-nice 0 --max-rtprio 1 \\\n"
+            "       --uid $UID --gid $GID\n"
+            "\n"
            );
     exit(0);
 }
 
 static void print_version() {
-    printf("lrun version " VERSION "\n" \
+    printf("lrun version " VERSION "\n"
            "Copyright (C) 2012 WU Jun <quark@zju.edu.cn>\n");
     exit(0);
 }
@@ -144,13 +144,13 @@ static void parse_options(int argc, char * argv[]) {
 
     // arg.rlimits settings
     config.arg.rlimits[RLIMIT_NICE] = 20 - 0;
-    config.arg.rlimits[RLIMIT_NOFILE] = 200;
-    config.arg.rlimits[RLIMIT_NPROC] = 300;
+    config.arg.rlimits[RLIMIT_NOFILE] = 256;
+    config.arg.rlimits[RLIMIT_NPROC] = 2048;
     config.arg.rlimits[RLIMIT_RTPRIO] = 1;
 
     config.arg.reset_env = 1;
 
-    // parse commandline options 
+    // parse commandline options
 #define REQUIRE_NARGV(n) \
     if (i + n >= argc) { \
         fprintf(stderr, "Option '%s' requires %d argument%s.\n", option.c_str(), n, n > 1 ? "s" : ""); \
@@ -304,7 +304,7 @@ static double now() {
 
 static void clean_cg_exit(Cgroup& cg, int exit_code = 2) {
     if (cg.destroy()) WARNING("can not destroy cgroup");
-    
+
     exit(exit_code);
 }
 
@@ -328,7 +328,7 @@ int main(int argc, char * argv[]) {
     check_environment();
     INFO("pid = %d", (int)getpid());
 
-    // pick an unique name and create a cgroup in filesystem 
+    // pick an unique name and create a cgroup in filesystem
     string group_name = "ze" + strconv::from_long((long)getpid());
     Cgroup cg = Cgroup::create(group_name);
 
@@ -368,7 +368,6 @@ int main(int argc, char * argv[]) {
             clean_cg_exit(cg);
         }
     }
-
 
     // reset cpu / memory usage and killall existing processes
     // not needed if cg can be guarnteed that is newly created
