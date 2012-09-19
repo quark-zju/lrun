@@ -38,6 +38,7 @@
 using namespace lrun;
 
 using std::string;
+using std::make_pair;
 
 static struct {
     Cgroup::spawn_arg arg;
@@ -360,7 +361,8 @@ int main(int argc, char * argv[]) {
     cg.set("memory.oom_control", "0\n");
 
     // other cgroup options
-    FOR_EACH(p, config.cgroup_options) {
+    for (auto it = config.cgroup_options.begin(); it != config.cgroup_options.end(); ++it) {
+        auto& p = (*it);
         if (cg.set(p.first, p.second)) {
             ERROR("can not set cgroup option '%s' to '%s'", p.first.c_str(), p.second.c_str());
             clean_cg_exit(cg);

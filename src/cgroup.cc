@@ -271,7 +271,9 @@ static int clone_fn(void * clone_arg) {
     Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
 
     // bind fs mounts
-    FOR_EACH(p, arg.bindfs_list) {
+    for (auto it = arg.bindfs_list.begin(); it != arg.bindfs_list.end(); ++it) {
+        auto& p = (*it);
+
         const string& dest = p.first;
         const string& src = p.second;
 
@@ -319,7 +321,9 @@ static int clone_fn(void * clone_arg) {
     if (namelist) free(namelist);
 
     // setup other tmpfs mounts
-    FOR_EACH(p, arg.tmpfs_list) {
+    for (auto it = arg.tmpfs_list.begin(); it != arg.tmpfs_list.end(); ++it) {
+        auto& p = (*it);
+
         const char * dest = p.first.c_str();
         const long long& size = p.second;
 
@@ -330,7 +334,7 @@ static int clone_fn(void * clone_arg) {
             // treat as read-only
             e = mount(NULL, dest, "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
         } else {
-            e = mount(NULL, dest, "tmpfs", MS_NOSUID, ("mode=0777,size=" + strconv::from_longlong(size)).c_str());
+            e = mount(NULL, dest, "tmpfs", MS_NOSUID, ((string)("mode=0777,size=" + strconv::from_longlong(size))).c_str());
         }
         if (e) {
             FATAL("mount tmpfs '%s' failed", dest);
@@ -348,7 +352,9 @@ static int clone_fn(void * clone_arg) {
     }
 
     // system commands
-    FOR_EACH(p, arg.cmd_list) system(p.c_str());
+    for (auto it = arg.cmd_list.begin(); it != arg.cmd_list.end(); ++it) {
+        system(it->c_str());
+    }
 
     // nice
     if (arg.nice) nice(arg.nice);
@@ -360,7 +366,9 @@ static int clone_fn(void * clone_arg) {
     }
 
     // apply rlimit, note NPROC limit should be applied after setuid
-    FOR_EACH(p, arg.rlimits) {
+    for (auto it = arg.rlimits.begin(); it != arg.rlimits.end(); ++it) {
+        auto& p = (*it);
+
         int resource = p.first;
         rlimit limit;
         limit.rlim_cur = limit.rlim_max = p.second;
@@ -380,7 +388,9 @@ static int clone_fn(void * clone_arg) {
         if (clearenv()) FATAL("can not clear env");
     }
 
-    FOR_EACH(p, arg.env_list) {
+    for (auto it = arg.env_list.begin(); it != arg.env_list.end(); ++it) {
+        auto& p = (*it);
+
         const char * name = p.first.c_str();
         const char * value = p.second.c_str();
 
