@@ -1,16 +1,16 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Copyright (C) 2012 WU Jun <quark@zju.edu.cn>
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -35,15 +35,32 @@ namespace lrun {
             // Cgroup static methods
 
             /**
+             * cgroup subsystem ids
+             */
+            enum subsys_id_t {
+                CG_CPUACCT = 0,
+                CG_MEMORY  = 1,
+                CG_DEVICES = 2,
+                CG_FREEZER = 3,
+            };
+
+            /**
+             * cgroup subsystem names
+             */
+            static const char subsys_names[4][8];
+            static const int SUBSYS_COUNT = sizeof(subsys_names) / sizeof(subsys_names[0]);
+
+
+            /**
              * get cgroup mounted path
              * @param   create_on_need  mount cgroup if not mounted
              * @return  cgroup mounted path (first one in mount table)
              */
-            static std::string base_path(bool create_on_need = true);
+            static std::string base_path(subsys_id_t subsys_id, bool create_on_need = true);
 
             /**
              * create a cgroup, use existed if possible
-             * @return 
+             * @return
              */
             static Cgroup create(const std::string& name);
 
@@ -54,18 +71,24 @@ namespace lrun {
             static int exists(const std::string& name);
 
             /**
+             * @param   subsys_id   cgroup subsystem id
              * @param   name        group name
              * @return  full path   "#{path_}/#{name}"
              */
-            static std::string path_from_name(const std::string& name);
+            static std::string path_from_name(subsys_id_t subsys_id, const std::string& name);
 
+            /**
+             * @param   subsys_id   cgroup subsystem id
+             * @return  full path
+             */
+            std::string subsys_path(subsys_id_t subsys_id);
 
             // Cgroup low level methods
 
             /**
              * killall processes and destroy this cgroup
-             * @return -1           failed
-             *          0           success
+             * @return 0            success
+             *         other        failed
              */
             int destroy();
 
@@ -76,7 +99,7 @@ namespace lrun {
              * @return  0           success
              *         <0           failed
              */
-            int set(const std::string& property, const std::string& value);
+            int set(subsys_id_t subsys_id, const std::string& property, const std::string& value);
 
             /**
              * get property
@@ -84,7 +107,7 @@ namespace lrun {
              * @param   max_length  max length to read (not include '\0')
              * @return  string      readed property, empty if fail
              */
-            std::string get(const std::string& property, size_t max_length = 255);
+            std::string get(subsys_id_t subsys_id, const std::string& property, size_t max_length = 255);
 
             /**
              * set a cgroup property to the same value as parent
@@ -92,7 +115,7 @@ namespace lrun {
              * @return  0           success
              *         <0           failed
              */
-            int inherit(const std::string& property);
+            int inherit(subsys_id_t subsys_id, const std::string& property);
 
             /**
              * attach a process
@@ -174,7 +197,7 @@ namespace lrun {
                 std::string chdir_path;     // chdir path, empty if not need to chdir
                 std::list<std::pair<std::string, long long> > tmpfs_list;
                                             // [(dest, bytes)] mount tmpfs in child FS (after chroot)
-                std::list<std::pair<std::string, std::string> > bindfs_list; 
+                std::list<std::pair<std::string, std::string> > bindfs_list;
                                             // [(dest, src)] mount bind in child FS (before chroot)
                 std::list<std::string> cmd_list;
                                             // cp file list
@@ -198,7 +221,13 @@ namespace lrun {
         private:
 
             Cgroup();
-            std::string path_;
+
+            std::string name_;
+
+            /**
+             * cached paths
+             */
+            static std::string subsys_base_paths_[SUBSYS_COUNT];
     };
 }
 

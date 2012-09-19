@@ -51,7 +51,7 @@ static struct {
     useconds_t interval;
     Cgroup* active_cgroup;
 
-    std::map<std::string, std::string> cgroup_options;
+    std::map<std::pair<Cgroup::subsys_id_t, std::string>, std::string> cgroup_options;
 } config;
 
 int DEBUG = 0;
@@ -95,7 +95,7 @@ static void print_help() {
             "                                hide filesystem subtree. size is in bytes.\n"
             "                                If bytes is 0, mount read-only.\n"
             "                                This is performed after chroot.\n"
-            "  --cgroup-option   key value   Apply cgroup setting before exec.\n"
+            // "  --cgroup-option   key value   Apply cgroup setting before exec.\n"
             "  --env             key value   Set environment variable before exec.\n"
             "  --fd              n           Do not close fd n.\n"
             "  --cmd             cmd         Execute system command after tmpfs mounted.\n"
@@ -236,11 +236,11 @@ static void parse_options(int argc, char * argv[]) {
             string path = NEXT_STRING_ARG;
             long long bytes = NEXT_LONG_LONG_ARG;
             config.arg.tmpfs_list.push_back(make_pair(path, bytes));
-        } else if (option == "cgroup-option") {
-            REQUIRE_NARGV(2);
-            string key = NEXT_STRING_ARG;
-            string value = NEXT_STRING_ARG;
-            config.cgroup_options[key] = value;
+        // } else if (option == "cgroup-option") {
+        //     REQUIRE_NARGV(2);
+        //     string key = NEXT_STRING_ARG;
+        //     string value = NEXT_STRING_ARG;
+        //     config.cgroup_options[key] = value;
         } else if (option == "env") {
             REQUIRE_NARGV(2);
             string key = NEXT_STRING_ARG;
@@ -280,20 +280,20 @@ static void check_environment() {
     }
 
     // should not be in cgroup
-    string proc_cg = fs::read("/proc/self/cgroup");
-    if (!proc_cg.empty()) {
-        for (int i = proc_cg.length() - 1; i > 0; --i) {
-            switch (proc_cg.c_str()[i]) {
-                case ' ': case '\n':
-                    continue;
-                case '/':
-                    i = -1;
-                    break;
-                default:
-                    FATAL("can not run inside a cgroup.");
-            }
-        }
-    }
+    // string proc_cg = fs::read("/proc/self/cgroup");
+    // if (!proc_cg.empty()) {
+    //     for (int i = proc_cg.length() - 1; i > 0; --i) {
+    //         switch (proc_cg.c_str()[i]) {
+    //             case ' ': case '\n':
+    //                 continue;
+    //             case '/':
+    //                 i = -1;
+    //                 break;
+    //             default:
+    //                 FATAL("can not run inside a cgroup.");
+    //         }
+    //     }
+    // }
 }
 
 static double now() {
@@ -354,20 +354,20 @@ int main(int argc, char * argv[]) {
     }
 
     // some cgroup options, fail quietly
-    cg.set("memory.swappiness", "0\n");
+    cg.set(Cgroup::CG_MEMORY, "memory.swappiness", "0\n");
 
     // enable oom killer now, otherwise child may enter D status before exec
     // old memory cgroup subsystem does not know this, ignore silently
-    cg.set("memory.oom_control", "0\n");
+    cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "0\n");
 
     // other cgroup options
-    for (auto it = config.cgroup_options.begin(); it != config.cgroup_options.end(); ++it) {
-        auto& p = (*it);
-        if (cg.set(p.first, p.second)) {
-            ERROR("can not set cgroup option '%s' to '%s'", p.first.c_str(), p.second.c_str());
-            clean_cg_exit(cg);
-        }
-    }
+    // for (auto it = config.cgroup_options.begin(); it != config.cgroup_options.end(); ++it) {
+    //     auto& p = (*it);
+    //     if (cg.set(p.first, p.second)) {
+    //         ERROR("can not set cgroup option '%s' to '%s'", p.first.c_str(), p.second.c_str());
+    //         clean_cg_exit(cg);
+    //     }
+    // }
 
     // reset cpu / memory usage and killall existing processes
     // not needed if cg can be guarnteed that is newly created

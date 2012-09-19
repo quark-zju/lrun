@@ -24,8 +24,8 @@
 #include "cgroup.h"
 #include "fs.h"
 #include "strconv.h"
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include <mntent.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
@@ -42,28 +42,44 @@ using namespace lrun;
 using std::string;
 using std::list;
 
+const char Cgroup::subsys_names[4][8] = {
+    "cpuacct",
+    "memory",
+    "devices",
+    "freezer",
+};
 
-string Cgroup::base_path(bool create_on_need) {
-    // FIXME cache may not work when user manually umount cgroup
-    string last_base_path;
-    if (!last_base_path.empty() && fs::is_dir(last_base_path)) return last_base_path;
+std::string Cgroup::subsys_base_paths_[sizeof(subsys_names) / sizeof(subsys_names[0])];
+
+string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
+    {
+        // FIXME cache may not work when user manually umount cgroup
+        // check last cached path
+        const string& path = subsys_base_paths_[subsys_id];
+        if ((!path.empty()) && fs::is_dir(path)) return path;
+    }
+
+    INFO("base_path(%d, %d)", (int)subsys_id, (int)create_on_need);
 
     // enumerate mounts
     std::map<string, string> mounts;
     FILE *fp = setmntent(fs::MOUNTS_PATH, "r");
-    if (!fp) return "";
+    if (!fp) {
+        FATAL("can not read %s", fs::MOUNTS_PATH);
+        return "";
+    }
 
     // no cgroups mounted, prepare one
-    const char * MNT_SRC_NAME = "cgroup_lrun";
+    const char * const MNT_SRC_NAME = "cgroup_lrun";
     const char * MNT_DEST_BASE_PATH = "/sys/fs/cgroup";
-    const char * MNT_DEST_PATH = "/sys/fs/cgroup/lrun";
+    const char * subsys_name = subsys_names[subsys_id];
 
     for (struct mntent *ent; (ent = getmntent(fp));) {
         mounts[string(ent->mnt_dir)] = string(ent->mnt_type);
-        if (strcmp(ent->mnt_type, fs::TYPE_CGROUP) == 0 && strcmp(ent->mnt_fsname, MNT_SRC_NAME) == 0) {
-            INFO("last_base_path = '%s'", ent->mnt_dir);
-            fclose(fp);
-            return (last_base_path = string(ent->mnt_dir));
+        if (strcmp(ent->mnt_type, fs::TYPE_CGROUP)) continue;
+        if (strstr(ent->mnt_opts, subsys_name)) {
+            INFO("found cgroup %s path = '%s'", subsys_name, ent->mnt_dir);
+            return (subsys_base_paths_[subsys_id] = string(ent->mnt_dir));
         }
     }
 
@@ -72,12 +88,12 @@ string Cgroup::base_path(bool create_on_need) {
     if (!fs::is_dir(MNT_DEST_BASE_PATH)) {
         // no /sys/fs/cgroup in system, try conservative location
         MNT_DEST_BASE_PATH = "/cgroup";
-        MNT_DEST_PATH = "/cgroup/lrun";
         mkdir(MNT_DEST_BASE_PATH, 0700);
     }
 
     // prepare tmpfs on MNT_DEST_BASE_PATH
     int dest_base_mounted = 0;
+
     if (mounts.count(string(MNT_DEST_BASE_PATH)) == 0) {
         int e = mount(NULL, MNT_DEST_BASE_PATH, fs::TYPE_TMPFS, MS_NOEXEC | MS_NOSUID, "size=16384,mode=0755");
         if (e != 0) FATAL("can not mount tmpfs on '%s'", MNT_DEST_BASE_PATH);
@@ -86,49 +102,70 @@ string Cgroup::base_path(bool create_on_need) {
         INFO("'%s' is already mounted, skip mounting tmpfs", MNT_DEST_BASE_PATH);
     }
 
-    // create and mount cgroup at MNT_DEST_BASE_PATH
-    INFO("mkdir and mounting '%s'", MNT_DEST_PATH);
-    mkdir(MNT_DEST_PATH, 0700);
-    int e = mount(MNT_SRC_NAME, MNT_DEST_PATH, fs::TYPE_CGROUP, MS_NOEXEC | MS_NOSUID, "cpuacct,memory,devices,freezer");
+    // create and mount cgroup at dest_path
+    string dest_path = string(MNT_DEST_BASE_PATH) + "/" + subsys_name;
+    INFO("mkdir and mounting '%s'", dest_path.c_str());
+    mkdir(dest_path.c_str(), 0700);
+    int e = mount(MNT_SRC_NAME, dest_path.c_str(), fs::TYPE_CGROUP, MS_NOEXEC | MS_NOSUID | MS_RELATIME | MS_NODEV, subsys_name);
 
     if (e != 0) {
         int last_err = errno;
         // fallback, umount tmpfs if it is just mounted
         if (dest_base_mounted) umount(MNT_DEST_BASE_PATH);
         errno = last_err;
-        FATAL("can not mount cgroup on '%s'", MNT_DEST_BASE_PATH);
+        FATAL("can not mount cgroup %s on '%s'", subsys_name, dest_path.c_str());
     }
 
-    return (last_base_path = string(MNT_DEST_PATH));
+    return (subsys_base_paths_[subsys_id] = dest_path);
 }
 
-string Cgroup::path_from_name(const string& name) {
-    return base_path() + "/" + name;
+string Cgroup::path_from_name(subsys_id_t subsys_id, const string& name) {
+    return base_path(subsys_id) + "/" + name;
 }
+
+string Cgroup::subsys_path(Cgroup::subsys_id_t subsys_id) {
+    return path_from_name(subsys_id, name_);
+}
+
 
 int Cgroup::exists(const string& name) {
-    return fs::is_dir(path_from_name(name));
+    for (int id = 0; id < SUBSYS_COUNT; ++id) {
+        if (!fs::is_dir(path_from_name((subsys_id_t)(id), name))) return false;
+    }
+    return true;
 }
 
 Cgroup Cgroup::create(const string& name) {
     Cgroup cg;
 
-    string path = path_from_name(name);
-
-    if (fs::is_dir(path)) {
-        cg.path_ = path;
+    if (exists(name)) {
+        INFO("create cgroup '%s': already exists", name.c_str());
+        cg.name_ = name;
         return cg;
     }
 
-    // not existed, create new
-    if (mkdir(path.c_str(), 0700) == 0) cg.path_ = path;
+    int success = 1;
+    for (int id = 0; id < SUBSYS_COUNT; ++id) {
+        string path = path_from_name((subsys_id_t)id, name);
+        if (fs::is_dir(path)) continue;
+        if (mkdir(path.c_str(), 0700)) {
+            INFO("mkdir '%s': failed, %s", path.c_str(), strerror(errno));
+            success = 0;
+            break;
+        } else {
+            INFO("mkdir '%s': ok", path.c_str());
+        }
+    }
+
+    if (success) cg.name_ = name;
+
     return cg;
 }
 
 Cgroup::Cgroup() { }
 
 bool Cgroup::valid() {
-    return !path_.empty() && fs::is_dir(path_);
+    return !name_.empty() && exists(name_);
 }
 
 int Cgroup::killall() {
@@ -137,8 +174,8 @@ int Cgroup::killall() {
     if (!valid()) return -1;
 
     // kill all processes
-    string procs_path = path_ + "/cgroup.procs";
-    string freeze_state_path = path_ + "/freezer.state";
+    string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
+    string freeze_state_path = subsys_path(CG_FREEZER) + "/freezer.state";
 
     // check procs_path first, return if empty
     if (fs::read(procs_path, 4).empty()) return 0;
@@ -158,7 +195,7 @@ int Cgroup::killall() {
         if (loop == 0) {
             PROGRESS_INFO("KILLING: ENABLING OOM");
             set_memory_limit(1);
-            if (set("memory.oom_control", "0\n") == 0) ++loop;
+            if (set(CG_MEMORY, "memory.oom_control", "0\n") == 0) ++loop;
         } else ++loop;
 
         // open cgroup.procs and read process ids
@@ -200,62 +237,76 @@ int Cgroup::killall() {
 
 int Cgroup::destroy() {
     killall();
-    rmdir(path_.c_str());
-    return valid() ? -1 : 0;
+
+    int ret = 0;
+    for (int id = 0; id < SUBSYS_COUNT; ++id) {
+        string path = subsys_path((subsys_id_t)id);
+        if (path.empty()) continue;
+        if (fs::is_dir(path)) ret |= rmdir(path.c_str());
+    }
+
+    return ret;
 }
 
-int Cgroup::set(const string& property, const string& value) {
-    return fs::write(path_ + "/" + property, value);
+int Cgroup::set(subsys_id_t subsys_id, const string& property, const string& value) {
+    return fs::write(subsys_path(subsys_id) + "/" + property, value);
 }
 
-string Cgroup::get(const string& property, size_t max_length) {
-    return fs::read(path_ + "/" + property, max_length);
+string Cgroup::get(subsys_id_t subsys_id, const string& property, size_t max_length) {
+    return fs::read(subsys_path(subsys_id) + "/" + property, max_length);
 }
 
-int Cgroup::inherit(const string& property) {
-    string value = fs::read(path_ + "/../" + property);
-    return fs::write(path_ + "/" + property, value);
+int Cgroup::inherit(subsys_id_t subsys_id, const string& property) {
+    string value = fs::read(base_path(subsys_id, false) + "/" + property);
+    return fs::write(subsys_path(subsys_id) + "/" + property, value);
 }
 
 int Cgroup::attach(pid_t pid) {
     char pidbuf[32];
     snprintf(pidbuf, sizeof(pidbuf), "%ld\n", (long)pid);
-    return fs::write(path_ + "/tasks", pidbuf);
+
+    int ret = 0;
+    for (int id = 0; id < SUBSYS_COUNT; ++id) {
+        string path = subsys_path((subsys_id_t)id);
+        ret |= fs::write(path + "/tasks", pidbuf);
+    }
+
+    return ret;
 }
 
 int Cgroup::limit_devices() {
     int e = 0;
-    e += set("devices.deny", "a");
-    e += set("devices.allow", "c 1:3 rwm"); // null
-    e += set("devices.allow", "c 1:5 rwm"); // zero
-    e += set("devices.allow", "c 1:7 rwm"); // full
-    e += set("devices.allow", "c 1:8 rwm"); // random
-    e += set("devices.allow", "c 1:9 rwm"); // urandom
+    e += set(CG_DEVICES, "devices.deny", "a");
+    e += set(CG_DEVICES, "devices.allow", "c 1:3 rwm"); // null
+    e += set(CG_DEVICES, "devices.allow", "c 1:5 rwm"); // zero
+    e += set(CG_DEVICES, "devices.allow", "c 1:7 rwm"); // full
+    e += set(CG_DEVICES, "devices.allow", "c 1:8 rwm"); // random
+    e += set(CG_DEVICES, "devices.allow", "c 1:9 rwm"); // urandom
     return e ? -1 : 0;
 }
 
 int Cgroup::reset_usages() {
     int e = 0;
-    e += set("cpuacct.usage", "0");
-    e += set("memory.max_usage_in_bytes", "0") * set("memory.memsw.max_usage_in_bytes", "0");
+    e += set(CG_CPUACCT, "cpuacct.usage", "0");
+    e += set(CG_MEMORY, "memory.max_usage_in_bytes", "0") * set(CG_MEMORY, "memory.memsw.max_usage_in_bytes", "0");
     return e ? -1 : 0;
 }
 
 double Cgroup::cpu_usage() {
-    string cpu_usage = get("cpuacct.usage", 31);
+    string cpu_usage = get(CG_CPUACCT, "cpuacct.usage", 31);
     // convert from nanoseconds to seconds
     return strconv::to_double(cpu_usage) / 1e9;
 }
 
 long long Cgroup::memory_usage() {
-    string usage = get("memory.memsw.max_usage_in_bytes");
-    if (usage.empty()) usage = get("memory.max_usage_in_bytes");
+    string usage = get(CG_MEMORY, "memory.memsw.max_usage_in_bytes");
+    if (usage.empty()) usage = get(CG_MEMORY, "memory.max_usage_in_bytes");
     return strconv::to_longlong(usage);
 }
 
 long long Cgroup::memory_limit() {
-    string limit = get("memory.memsw.limit_in_bytes");
-    if (limit.empty()) limit = get("memory.limit_in_bytes");
+    string limit = get(CG_MEMORY, "memory.memsw.limit_in_bytes");
+    if (limit.empty()) limit = get(CG_MEMORY, "memory.limit_in_bytes");
     return strconv::to_longlong(limit);
 }
 
@@ -264,11 +315,11 @@ int Cgroup::set_memory_limit(long long bytes) {
 
     if (bytes <= 0) {
         // read base (parent) cgroup properties
-        e *= inherit("memory.memsw.limit_in_bytes");
-        e *= inherit("memory.limit_in_bytes");
+        e *= inherit(CG_MEMORY, "memory.memsw.limit_in_bytes");
+        e *= inherit(CG_MEMORY, "memory.limit_in_bytes");
     } else {
-        e *= set("memory.memsw.limit_in_bytes", strconv::from_longlong(bytes));
-        e *= set("memory.limit_in_bytes", strconv::from_longlong(bytes));
+        e *= set(CG_MEMORY, "memory.memsw.limit_in_bytes", strconv::from_longlong(bytes));
+        e *= set(CG_MEMORY, "memory.limit_in_bytes", strconv::from_longlong(bytes));
     }
 
     return e ? -1 : 0;
@@ -502,7 +553,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         // Note: a process can enter D (uninterruptable sleep) status
         // when oom killer disabled, killing it requires re-enable oom killer
         // or enlarge memory limit
-        if (set("memory.oom_control", "1\n")) INFO("can not set memory.oom_control");
+        if (set(CG_MEMORY, "memory.oom_control", "1\n")) INFO("can not set memory.oom_control");
     }
 
 cleanup:
