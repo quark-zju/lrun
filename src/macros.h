@@ -30,24 +30,48 @@
 # define _GNU_SOURCE 1
 #endif
 
-#define VERSION "0.9.3.5"
+#define VERSION "0.9.4.0"
 
 #include <cstdio>
 #include <cstdlib>
 #include <errno.h>
 #include <string.h>
 
-#ifdef DEBUG
-# define SHOW_SOURCE_LOCATION \
-    fprintf(stderr, "  at %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-#else
-# define SHOW_SOURCE_LOCATION
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+extern double now();
+
+#ifdef __cplusplus
+}
+#endif
+
+extern double DEBUG_START_TIME;
+extern int DEBUG_ENABLED;
+extern int DEBUG_TIMESTAMP;
+extern int DEBUG_PROGRESS;
+extern int DEBUG_PID;
+
+#define NOW now()
+#define TIMESTAMP (now() - DEBUG_START_TIME)
+
+#define SHOW_SOURCE_LOCATION \
+    if (DEBUG_ENABLED) fprintf(stderr, "  at %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+#define DEBUG_DO if (DEBUG_ENABLED)
+
+#define PRINT_TIMESTAMP \
+{   \
+    if (DEBUG_TIMESTAMP) fprintf(stderr, "[%8.3f]", TIMESTAMP); \
+    if (DEBUG_PID) fprintf(stderr, "[%6d] ", (int)getpid()); \
+}
 
 #define FATAL(...) \
 {   \
     fflush(stderr); \
-    fprintf(stderr, "[%d] FATAL: ", getpid()); \
+    PRINT_TIMESTAMP; \
+    fprintf(stderr, "FATAL: "); \
     fprintf(stderr, __VA_ARGS__); \
     if (errno) fprintf(stderr, " (%s)", strerror(errno)); \
     fprintf(stderr, "\n"); \
@@ -59,7 +83,8 @@
 #define ERROR(...) \
 { \
     fflush(stderr); \
-    fprintf(stderr, "[%d] ERROR: ", getpid()); \
+    PRINT_TIMESTAMP; \
+    fprintf(stderr, "ERROR: "); \
     fprintf(stderr, __VA_ARGS__); \
     if (errno) fprintf(stderr, " (%s)", strerror(errno)); \
     fprintf(stderr, "\n"); \
@@ -70,7 +95,8 @@
 #define WARNING(...) \
 { \
     fflush(stderr); \
-    fprintf(stderr, "[%d] WARNING: ", getpid()); \
+    PRINT_TIMESTAMP; \
+    fprintf(stderr, "WARNING: "); \
     fprintf(stderr, __VA_ARGS__); \
     fprintf(stderr, "\n"); \
     SHOW_SOURCE_LOCATION \
@@ -78,16 +104,17 @@
 }
 
 #define INFO(...) \
-if (__builtin_expect(DEBUG, 0)) { \
+if (__builtin_expect(DEBUG_ENABLED, 0)) { \
     fflush(stderr); \
-    fprintf(stderr, "[%d] INFO: ", getpid()); \
+    PRINT_TIMESTAMP; \
+    fprintf(stderr, "INFO: "); \
     fprintf(stderr, __VA_ARGS__); \
     fprintf(stderr, "\n"); \
     fflush(stderr); \
 }
 
 #define PROGRESS_INFO(...) \
-if (__builtin_expect(DEBUG, 0)) { \
+if (__builtin_expect(DEBUG_PROGRESS, 0)) { \
     fflush(stderr); \
     fprintf(stderr, __VA_ARGS__); \
     fprintf(stderr, "        \r"); \
@@ -109,6 +136,3 @@ if (__builtin_expect(DEBUG, 0)) { \
     for (__typeof(*(v.begin()))& i = *VAR_UNIQUE(_i); VAR_UNIQUE(_fes); VAR_UNIQUE(_fes) = 0)
 #endif
 
-#ifndef DEBUG
-extern int DEBUG;
-#endif

@@ -23,6 +23,7 @@
 #include "fs.h"
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <cerrno>
 #include <unistd.h>
 #include <dirent.h>

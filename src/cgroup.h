@@ -59,8 +59,8 @@ namespace lrun {
             static std::string base_path(subsys_id_t subsys_id, bool create_on_need = true);
 
             /**
-             * create a cgroup, use existed if possible
-             * @return
+             * create a cgroup, use existing if possible
+             * @return  Cgroup object
              */
             static Cgroup create(const std::string& name);
 

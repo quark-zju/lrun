@@ -1,4 +1,5 @@
 BINARIES=lrun
+OBJECTS=lrun.o strconv.o fs.o cgroup.o macros.o
 CXXFLAGS=-O2 -std=c++0x -Wall
 LDFLAGS=
 LD=g++
@@ -9,16 +10,14 @@ INSTALL?=/usr/bin/env install -c -D
 
 all: $(BINARIES)
 
-lrun: lrun.o strconv.o fs.o cgroup.o
+lrun: $(OBJECTS)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 clean:
-	-rm -f *.o $(BINARIES)
+	-rm -f $(OBJECTS) $(BINARIES)
 
-.o.cc:
-
-.o:
-	$(CXX) $(LDFLAGS) $^ -o $@
+$(OBJECTS): %.o: %.cc
+	$(CXX) $(CXXFLAGS) $^ -c -o $@
 
 install: lrun
 	$(INSTALL) -m4555 -oroot -groot -s $< $(DESTDIR)$(PREFIX)/bin/lrun

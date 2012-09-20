@@ -417,11 +417,15 @@ static int clone_fn(void * clone_arg) {
 
     // system commands
     for (auto it = arg.cmd_list.begin(); it != arg.cmd_list.end(); ++it) {
+        INFO("system %s", it->c_str());
         system(it->c_str());
     }
 
     // nice
-    if (arg.nice) nice(arg.nice);
+    if (arg.nice) {
+        INFO("nice %d", (int)arg.nice);
+        nice(arg.nice);
+    }
 
     // setup uid, gid
     INFO("setgid %d, setuid %d", (int)arg.gid, (int)arg.uid);
@@ -440,7 +444,33 @@ static int clone_fn(void * clone_arg) {
         // wish to receive SIGXCPU to know it is TLE
         if (resource == RLIMIT_CPU) ++limit.rlim_max;
 
-        INFO("setrlimit %d, [%d, %d]", resource, (int)limit.rlim_cur, (int)limit.rlim_max);
+        DEBUG_DO {
+            char limit_name[16];
+            switch (resource) {
+#define CONVERT_NAME(x) case x: strncpy(limit_name, # x, sizeof(limit_name)); break;
+                CONVERT_NAME(RLIMIT_CPU);
+                CONVERT_NAME(RLIMIT_FSIZE);
+                CONVERT_NAME(RLIMIT_DATA);
+                CONVERT_NAME(RLIMIT_STACK);
+                CONVERT_NAME(RLIMIT_CORE);
+                CONVERT_NAME(RLIMIT_RSS);
+                CONVERT_NAME(RLIMIT_NOFILE);
+                CONVERT_NAME(RLIMIT_AS);
+                CONVERT_NAME(RLIMIT_NPROC);
+                CONVERT_NAME(RLIMIT_MEMLOCK);
+                CONVERT_NAME(RLIMIT_LOCKS);
+                CONVERT_NAME(RLIMIT_SIGPENDING);
+                CONVERT_NAME(RLIMIT_MSGQUEUE);
+                CONVERT_NAME(RLIMIT_NICE);
+                CONVERT_NAME(RLIMIT_RTPRIO);
+                CONVERT_NAME(RLIMIT_RTTIME);
+                CONVERT_NAME(RLIMIT_NLIMITS);
+#undef CONVERT_NAME
+                default:
+                    snprintf(limit_name, sizeof(limit_name), "0x%x", resource);
+            }
+            INFO("setrlimit %s, cur: %d, max: %d", limit_name, (int)limit.rlim_cur, (int)limit.rlim_max);
+        }
         if (setrlimit(resource, &limit)) {
             FATAL("can not set rlimit %d", resource);
         }
@@ -462,10 +492,12 @@ static int clone_fn(void * clone_arg) {
     }
 
     // all prepared! blocking, wait for parent
+    INFO("waiting for parent");
     char buf[4];
     read(arg.sockets[0], buf, sizeof buf);
 
     // let parent know we got the message, parent then can close fd without SIGPIPE child
+    INFO("got from parent: '%3s'. notify parent", buf);
     strcpy(buf, "PRE");
     write(arg.sockets[0], buf, sizeof buf);
 
@@ -473,6 +505,7 @@ static int clone_fn(void * clone_arg) {
     // if exec fails, it will be closed upon process exit (aka. this function returns)
 
     // exec target
+    INFO("execvp %s ...", arg.args[0]);
     execvp(arg.args[0], arg.args);
 
     // exec failed, store errno
@@ -520,7 +553,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     void * stack = (void*)((char*)alloca(stack_size) + stack_size);
     char buf[] = "RUN";
 
-    if (DEBUG) {
+    DEBUG_DO {
         int v = clone_flags;
         string s;
         #define TEST_FLAG(x) if ((v & x) != 0) { s += string(# x) + " | "; v ^= x; }
@@ -597,6 +630,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     INFO("child pid = %d", (int)child_pid);
 
     // attach child to current cgroup
+    INFO("attach %d", (int)child_pid);
     attach(child_pid);
 
     // child is blocking, waiting us before exec, let it go
@@ -604,7 +638,9 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     write(arg.sockets[1], buf, sizeof buf);
 
     // wait for child response
+    INFO("reading from child");
     read(arg.sockets[1], buf, sizeof buf);
+    INFO("from child, got '%3s'", buf);
     if (buf[0] != 'P') {
         // child has problem
         WARNING("child does not work as expected (buf = '%s')", buf);

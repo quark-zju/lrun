@@ -27,13 +27,15 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <vector>
 #include <string>
 #include <unistd.h>
-#include <sys/time.h>
 #include <sys/wait.h>
+#include <sys/types.h>
 #include <sys/resource.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <grp.h>
 
 using namespace lrun;
 
@@ -49,12 +51,12 @@ static struct {
     bool enable_network;
     bool enable_user_proc_namespace;
     useconds_t interval;
+    string cgname;
     Cgroup* active_cgroup;
 
+    std::vector<gid_t> groups;
     std::map<std::pair<Cgroup::subsys_id_t, std::string>, std::string> cgroup_options;
 } config;
-
-int DEBUG = 0;
 
 static void print_help() {
     fprintf(stderr,
@@ -85,6 +87,11 @@ static void print_help() {
             "  --uid             uid         Set uid to specified uid (uid > 0).\n"
             "  --gid             gid         Set gid to specified gid (gid > 0).\n"
             "  --interval        seconds     Set interval status update interval.\n"
+            "  --cgname          string      Specify cgroup name to use.\n"
+            "                                Specified cgroup will be created on demand, \n"
+            "                                and will not be deleted. If this option is \n"
+            "                                not set, lrun will pick an unique cgroup name \n"
+            "                                and destroy the cgroup upon exit.\n"
             "  --help                        Show this help.\n"
             "  --version                     Show version information.\n"
             "\n"
@@ -98,6 +105,7 @@ static void print_help() {
             // "  --cgroup-option   key value   Apply cgroup setting before exec.\n"
             "  --env             key value   Set environment variable before exec.\n"
             "  --fd              n           Do not close fd n.\n"
+            "  --group           gid         Set additional groups.\n"
             "  --cmd             cmd         Execute system command after tmpfs mounted.\n"
             "\n"
             "Return value:\n"
@@ -216,16 +224,23 @@ static void parse_options(int argc, char * argv[]) {
             config.arg.nice = (int)NEXT_LONG_LONG_ARG;
         } else if (option == "uid") {
             REQUIRE_NARGV(1);
-            long long uid = NEXT_LONG_LONG_ARG;
-            if (uid > 0) config.arg.uid = (uid_t)uid;
+            uid_t uid = (uid_t)NEXT_LONG_LONG_ARG;
+            if (uid != 0) config.arg.uid = uid;
         } else if (option == "gid") {
             REQUIRE_NARGV(1);
-            long long gid = NEXT_LONG_LONG_ARG;
-            if (gid > 0) config.arg.gid = (gid_t)gid;
+            gid_t gid = (gid_t)NEXT_LONG_LONG_ARG;
+            if (gid != 0) config.arg.gid = gid;
+        } else if (option == "group") {
+            REQUIRE_NARGV(1);
+            gid_t gid = (gid_t)NEXT_LONG_LONG_ARG;
+            if (gid != 0) config.groups.push_back(gid);
         } else if (option == "interval") {
             REQUIRE_NARGV(1);
             useconds_t interval = (useconds_t)(NEXT_DOUBLE_ARG * 1000000);
             if (interval > 0) config.interval = interval;
+        } else if (option == "cgname") {
+            REQUIRE_NARGV(1);
+            config.cgname = NEXT_STRING_ARG;
         } else if (option == "bindfs") {
             REQUIRE_NARGV(2);
             string dst = NEXT_STRING_ARG;
@@ -276,34 +291,34 @@ static void parse_options(int argc, char * argv[]) {
 static void check_environment() {
     // require root
     if (geteuid() != 0 || setuid(0)) {
-        FATAL("root required.");
+        FATAL("lrun: root required. (current euid = %d, uid = %d)", geteuid(), getuid());
     }
 
-    // should not be in cgroup
-    // string proc_cg = fs::read("/proc/self/cgroup");
-    // if (!proc_cg.empty()) {
-    //     for (int i = proc_cg.length() - 1; i > 0; --i) {
-    //         switch (proc_cg.c_str()[i]) {
-    //             case ' ': case '\n':
-    //                 continue;
-    //             case '/':
-    //                 i = -1;
-    //                 break;
-    //             default:
-    //                 FATAL("can not run inside a cgroup.");
-    //         }
-    //     }
-    // }
+    // normalize group
+    int e = setgid(0);
+    if (e) ERROR("setgid(0) failed");
+
+    e = setgroups(config.groups.size(), &config.groups[0]);
+    if (e) ERROR("setgroups failed");
 }
 
+#ifndef NOW
+#include <sys/time.h>
 static double now() {
     struct timeval t;
     gettimeofday(&t, 0);
     return t.tv_usec / 1e6 + t.tv_sec;
 }
+#endif
 
 static void clean_cg_exit(Cgroup& cg, int exit_code = 2) {
-    if (cg.destroy()) WARNING("can not destroy cgroup");
+    INFO("cleaning and exiting with code = %d", exit_code);
+
+    if (config.cgname.empty()) {
+        if (cg.destroy()) WARNING("can not destroy cgroup");
+    } else {
+        if (cg.killall() < 0) WARNING("can not kill all processes in cgroup");
+    }
 
     exit(exit_code);
 }
@@ -320,7 +335,7 @@ static void signal_handler(int signal) {
 
 int main(int argc, char * argv[]) {
 
-    DEBUG = (getenv("DEBUG") != 0);
+    DEBUG_ENABLED = (getenv("DEBUG") != 0);
 
     if (argc <= 1) print_help();
     parse_options(argc, argv);
@@ -329,10 +344,14 @@ int main(int argc, char * argv[]) {
     INFO("pid = %d", (int)getpid());
 
     // pick an unique name and create a cgroup in filesystem
-    string group_name = "lrun" + strconv::from_long((long)getpid());
-    Cgroup cg = Cgroup::create(group_name);
+    string cgname = config.cgname;
+    if (cgname.empty()) cgname = "lrun" + strconv::from_long((long)getpid());
+    INFO("cgname = '%s'", cgname.c_str());
 
-    if (!cg.valid()) FATAL("can not create cgroup '%s'", group_name.c_str());
+    // create or reuse group
+    Cgroup cg = Cgroup::create(cgname);
+
+    if (!cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
     config.active_cgroup = &cg;
 
     // assume cg is created just now and nobody has used it before.
