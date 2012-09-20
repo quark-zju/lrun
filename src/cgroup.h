@@ -81,7 +81,7 @@ namespace lrun {
              * @param   subsys_id   cgroup subsystem id
              * @return  full path
              */
-            std::string subsys_path(subsys_id_t subsys_id);
+            std::string subsys_path(subsys_id_t subsys_id) const;
 
             // Cgroup low level methods
 
@@ -107,7 +107,7 @@ namespace lrun {
              * @param   max_length  max length to read (not include '\0')
              * @return  string      readed property, empty if fail
              */
-            std::string get(subsys_id_t subsys_id, const std::string& property, size_t max_length = 255);
+            std::string get(subsys_id_t subsys_id, const std::string& property, size_t max_length = 255) const;
 
             /**
              * set a cgroup property to the same value as parent
@@ -130,7 +130,19 @@ namespace lrun {
              * @return  true        valid
              *          false       invalid
              */
-            bool valid();
+            bool valid() const;
+
+            /**
+             * scan group processes and update output usage
+             */
+            void update_output_count();
+
+
+            /**
+             * return output usage
+             * @return  bytes      output usage
+             */
+            long long output_usage() const;
 
             // Cgroup high level methods
 
@@ -146,19 +158,19 @@ namespace lrun {
              * get memory usage
              * @return  memory usage in bytes
              */
-            long long memory_usage();
+            long long memory_usage() const;
 
             /**
              * get memory limit
              * @return  memory limit in bytes
              */
-            long long memory_limit();
+            long long memory_limit() const;
 
             /**
              * get cpu usage
              * @return  cpu usage in seconds
              */
-            double cpu_usage();
+            double cpu_usage() const;
 
             /**
              * set memory usage limit
@@ -223,12 +235,22 @@ namespace lrun {
 
             Cgroup();
 
+            /**
+             * cgroup directory name
+             */
             std::string name_;
+
+            /**
+             * count output bytes
+             */
+            std::map<long, long long> output_counter_;
+
 
             /**
              * cached paths
              */
             static std::string subsys_base_paths_[SUBSYS_COUNT];
+
     };
 }
 

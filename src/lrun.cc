@@ -48,6 +48,7 @@ static struct {
     double cpu_time_limit;
     double real_time_limit;
     long long memory_limit;
+    long long output_limit;
     bool enable_devices_whitelist;
     bool enable_network;
     bool enable_user_proc_namespace;
@@ -70,6 +71,8 @@ static void print_help() {
             "  --max-real-time   seconds     Limit real time, seconds can be rational.\n"
             "  --max-memory      bytes       Limit memory (+swap) usage in bytes.\n"
             "                                This value should not be too small.\n"
+            "  --max-output      bytes       Limit output. Note: output limit is not\n"
+            "                                very accurate.\n"
             "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n"
             "                                is not seperated, current processes are\n"
             "                                counted. Set uid to resolve this issue.\n"
@@ -117,8 +120,8 @@ static void print_help() {
             "    exit status of executed command to fd 3.\n"
             "\n"
             "Default options:\n"
-            "  lrun --network false --basic-devices true --isolate-process true \\\n"
-            "       --reset-env true --interval 0.05 \\\n"
+            "  lrun --network true --basic-devices false --isolate-process true \\\n"
+            "       --reset-env false --interval 0.05 \\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
             "       --min-nice 0 --max-rtprio 1 \\\n"
             "       --uid $UID --gid $GID\n"
@@ -138,8 +141,9 @@ static void parse_options(int argc, char * argv[]) {
     config.cpu_time_limit = -1;
     config.real_time_limit = -1;
     config.memory_limit = -1;
-    config.enable_devices_whitelist = true;
-    config.enable_network = false;
+    config.output_limit = -1;
+    config.enable_devices_whitelist = false;
+    config.enable_network = true;
     config.enable_user_proc_namespace = true;
     config.interval = (useconds_t)(0.05 * 1000000);
     config.active_cgroup = NULL;
@@ -158,8 +162,7 @@ static void parse_options(int argc, char * argv[]) {
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
     config.arg.rlimits[RLIMIT_NPROC] = 2048;
     config.arg.rlimits[RLIMIT_RTPRIO] = 1;
-
-    config.arg.reset_env = 1;
+    config.arg.reset_env = 0;
 
     // parse commandline options
 #define REQUIRE_NARGV(n) \
@@ -189,6 +192,9 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "max-memory") {
             REQUIRE_NARGV(1);
             config.memory_limit = NEXT_LONG_LONG_ARG;
+        } else if (option == "max-output") {
+            REQUIRE_NARGV(1);
+            config.output_limit = NEXT_LONG_LONG_ARG;
         } else if (option == "max-nprocess") {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NPROC] = NEXT_LONG_LONG_ARG;
@@ -366,7 +372,7 @@ int main(int argc, char * argv[]) {
     if (config.enable_devices_whitelist) {
         if (cg.limit_devices()) {
             ERROR("can not enable devices whitelist");
-            clean_cg_exit(cg);
+            clean_cg_exit(cg, 1);
         }
     }
 
@@ -374,7 +380,7 @@ int main(int argc, char * argv[]) {
     if (config.memory_limit > 0) {
         if (cg.set_memory_limit(config.memory_limit)) {
             ERROR("can not set memory limit");
-            clean_cg_exit(cg);
+            clean_cg_exit(cg, 1);
         }
     }
 
@@ -400,12 +406,12 @@ int main(int argc, char * argv[]) {
     // not needed if cg can be guarnteed that is newly created
     if (cg.killall()) {
         ERROR("can not stop running processes in group.");
-        clean_cg_exit(cg);
+        clean_cg_exit(cg, 1);
     }
 
     if (cg.reset_usages()) {
         ERROR("can not reset cpu time / memory usage counter.");
-        clean_cg_exit(cg);
+        clean_cg_exit(cg, 1);
     }
 
     // fd 3 should not be inherited by child process
@@ -413,7 +419,7 @@ int main(int argc, char * argv[]) {
         // ignore bad fd error
         if (errno != EBADF) {
             ERROR("can not set FD_CLOEXEC on fd 3");
-            clean_cg_exit(cg);
+            clean_cg_exit(cg, 1);
         }
     }
 
@@ -434,8 +440,8 @@ int main(int argc, char * argv[]) {
     pid = cg.spawn(config.arg);
 
     if (pid <= 0) {
-        // error message is printed before
-        clean_cg_exit(cg);
+        // error messages are printed before
+        clean_cg_exit(cg, -pid);
     }
 
     // no sigpipe
@@ -460,7 +466,7 @@ int main(int argc, char * argv[]) {
     int stat = 0;
 
     // which limit exceed
-    string excceded_limit = "";
+    string exceeded_limit = "";
 
     while (running) {
         // check stat
@@ -485,20 +491,20 @@ int main(int argc, char * argv[]) {
 
         // check time limit exceed
         if (config.cpu_time_limit > 0 && cg.cpu_usage() >= config.cpu_time_limit) {
-            excceded_limit = "CPU_TIME";
+            exceeded_limit = "CPU_TIME";
             break;
         }
 
         // check realtime exceed
         if (deadline > 0 && now() >= deadline) {
-            excceded_limit = "REAL_TIME";
+            exceeded_limit = "REAL_TIME";
             break;
         }
 
         // check memory limit
         long long memory_limit = cg.memory_limit();
         if (cg.memory_usage() >= memory_limit && memory_limit > 0) {
-            excceded_limit = "MEMORY";
+            exceeded_limit = "MEMORY";
             break;
         }
 
@@ -512,12 +518,26 @@ int main(int argc, char * argv[]) {
             e = waitpid(pid, &stat, WNOHANG);
             if (e == -1) {
                 // something goes wrong, give up
-                clean_cg_exit(cg, 3);
+                clean_cg_exit(cg, 4);
             }
         }
 
-        PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2f",
-                cg.cpu_usage(), now() - start_time, cg.memory_usage() / 1.e6);
+        if (config.output_limit > 0) {
+            cg.update_output_count();
+            long long output_bytes = cg.output_usage();
+
+            if (output_bytes > config.output_limit) {
+                exceeded_limit = "OUTPUT";
+                break;
+            }
+
+            PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2fM | OUT %LdB",
+            cg.cpu_usage(), now() - start_time, cg.memory_usage() / 1.e6, output_bytes);
+        } else {
+            PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2fM",
+            cg.cpu_usage(), now() - start_time, cg.memory_usage() / 1.e6);
+        }
+
         // sleep for a while
         usleep(config.interval);
     }
@@ -528,19 +548,19 @@ int main(int argc, char * argv[]) {
     long long memory_usage = cg.memory_usage();
     if (config.memory_limit > 0 && memory_usage >= config.memory_limit) {
         memory_usage = config.memory_limit;
-        excceded_limit = "MEMORY";
+        exceeded_limit = "MEMORY";
     }
 
     double cpu_time_usage = cg.cpu_usage();
     if ((WIFSIGNALED(stat) && WTERMSIG(stat) == SIGXCPU) || (config.cpu_time_limit > 0 && cpu_time_usage >= config.cpu_time_limit)) {
         cpu_time_usage = config.cpu_time_limit;
-        excceded_limit = "CPU_TIME";
+        exceeded_limit = "CPU_TIME";
     }
 
     double real_time_usage = now() - start_time;
     if (config.real_time_limit > 0 && real_time_usage >= config.real_time_limit) {
         real_time_usage = config.real_time_limit;
-        excceded_limit = "REAL_TIME";
+        exceeded_limit = "REAL_TIME";
     }
 
     char status_report[4096];
@@ -557,7 +577,7 @@ int main(int argc, char * argv[]) {
             WIFSIGNALED(stat) ? 1 : 0,
             WEXITSTATUS(stat),
             WTERMSIG(stat),
-            excceded_limit.empty() ? "none" : excceded_limit.c_str());
+            exceeded_limit.empty() ? "none" : exceeded_limit.c_str());
 
     write(3, status_report, strlen(status_report));
 

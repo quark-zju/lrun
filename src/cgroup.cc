@@ -121,7 +121,7 @@ string Cgroup::path_from_name(subsys_id_t subsys_id, const string& name) {
     return base_path(subsys_id) + "/" + name;
 }
 
-string Cgroup::subsys_path(Cgroup::subsys_id_t subsys_id) {
+string Cgroup::subsys_path(Cgroup::subsys_id_t subsys_id) const {
     return path_from_name(subsys_id, name_);
 }
 
@@ -162,8 +162,36 @@ Cgroup Cgroup::create(const string& name) {
 
 Cgroup::Cgroup() { }
 
-bool Cgroup::valid() {
+bool Cgroup::valid() const {
     return !name_.empty() && exists(name_);
+}
+
+void Cgroup::update_output_count() {
+    if (!valid()) return;
+    string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
+
+    if (fs::read(procs_path, 4).empty()) return;
+
+    FILE * procs = fopen(procs_path.c_str(), "r");
+    char spid[sizeof(pid_t) * 4];
+    while (fscanf(procs, "%s", spid) == 1) {
+        long pid;
+        long long bytes = 0;
+        sscanf(spid, "%ld", &pid);
+        FILE * io = fopen((string(fs::PROC_PATH) + "/" + spid + "/io").c_str(), "r");
+        fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
+        if (output_counter_[pid] < bytes) output_counter_[pid] = bytes;
+        fclose(io);
+    }
+    fclose(procs);
+}
+
+long long Cgroup::output_usage() const {
+    long long bytes = 0;
+    for (const auto& p : output_counter_) {
+        bytes += p.second;
+    }
+    return bytes;
 }
 
 int Cgroup::killall() {
@@ -250,7 +278,7 @@ int Cgroup::set(subsys_id_t subsys_id, const string& property, const string& val
     return fs::write(subsys_path(subsys_id) + "/" + property, value);
 }
 
-string Cgroup::get(subsys_id_t subsys_id, const string& property, size_t max_length) {
+string Cgroup::get(subsys_id_t subsys_id, const string& property, size_t max_length) const {
     return fs::read(subsys_path(subsys_id) + "/" + property, max_length);
 }
 
@@ -287,22 +315,23 @@ int Cgroup::reset_usages() {
     int e = 0;
     e += set(CG_CPUACCT, "cpuacct.usage", "0");
     e += set(CG_MEMORY, "memory.max_usage_in_bytes", "0") * set(CG_MEMORY, "memory.memsw.max_usage_in_bytes", "0");
+    output_counter_.clear();
     return e ? -1 : 0;
 }
 
-double Cgroup::cpu_usage() {
+double Cgroup::cpu_usage() const {
     string cpu_usage = get(CG_CPUACCT, "cpuacct.usage", 31);
     // convert from nanoseconds to seconds
     return strconv::to_double(cpu_usage) / 1e9;
 }
 
-long long Cgroup::memory_usage() {
+long long Cgroup::memory_usage() const {
     string usage = get(CG_MEMORY, "memory.memsw.max_usage_in_bytes");
     if (usage.empty()) usage = get(CG_MEMORY, "memory.max_usage_in_bytes");
     return strconv::to_longlong(usage);
 }
 
-long long Cgroup::memory_limit() {
+long long Cgroup::memory_limit() const {
     string limit = get(CG_MEMORY, "memory.memsw.limit_in_bytes");
     if (limit.empty()) limit = get(CG_MEMORY, "memory.limit_in_bytes");
     return strconv::to_longlong(limit);
@@ -652,6 +681,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
     // child exec may fail, confirm
     if (read(arg.sockets[1], buf, sizeof buf) > 0 && buf[0] == 'E') {
+        INFO("seems child exec failed");
         child_pid = -3;
     } else {
         // disable oom killer now
