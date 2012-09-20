@@ -34,6 +34,7 @@
 namespace fs = lrun::fs;
 using std::string;
 
+const char * const fs::PROC_PATH = "/proc";
 const char * const fs::MOUNTS_PATH = "/proc/mounts";
 const char * const fs::TYPE_CGROUP = "cgroup";
 const char * const fs::TYPE_TMPFS  = "tmpfs";
@@ -128,21 +129,23 @@ int fs::mount_bind(const string& src, const string& dest) {
                   NULL,
                   MS_BIND | MS_NOSUID,
                   NULL);
-
-    if (e < 0) return -1;
-
-    return 0;
+    return e;
 }
 
 int fs::mount_tmpfs(const string& dest, size_t max_size, mode_t mode) {
     char tmpfs_opts[256];
     snprintf(tmpfs_opts, sizeof tmpfs_opts, "size=%lu,mode=0%o", (unsigned long)max_size, (unsigned int)mode);
 
-    return mount(NULL,
+    int e = mount(NULL,
                  dest.c_str(),
                  TYPE_TMPFS,
-                 MS_NOSUID | MS_NODEV,
+                 MS_NOSUID | MS_NODEV | MS_SLAVE,
                  tmpfs_opts);
+    return e;
+}
+
+int fs::mount_set_shared(const string& dest, int type) {
+    return mount(NULL, dest.c_str(), NULL, type, NULL);
 }
 
 int fs::umount(const string& dest, bool lazy) {

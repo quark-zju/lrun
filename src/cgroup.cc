@@ -59,8 +59,6 @@ string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
         if ((!path.empty()) && fs::is_dir(path)) return path;
     }
 
-    INFO("base_path(%d, %d)", (int)subsys_id, (int)create_on_need);
-
     // enumerate mounts
     std::map<string, string> mounts;
     FILE *fp = setmntent(fs::MOUNTS_PATH, "r");
@@ -331,6 +329,11 @@ static int clone_fn(void * clone_arg) {
     // fs and uid settings should be done here
     Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
 
+    // make sure filesystem not be shared
+    if (fs::mount_set_shared("/", MS_PRIVATE | MS_REC)) {
+        FATAL("can not mount --make-rprivate /");
+    }
+
     // bind fs mounts
     for (auto it = arg.bindfs_list.begin(); it != arg.bindfs_list.end(); ++it) {
         auto& p = (*it);
@@ -509,7 +512,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     fcntl(arg.sockets[1], F_SETFD, FD_CLOEXEC);
 
     // We need root permissions and drop root later, no CLONE_NEWUSER here
-    // CLONE_NEWS is required for private mounts
+    // CLONE_NEWNS is required for private mounts
     // CLONE_NEWUSER is not used because new uid 0 may be non-root
     int clone_flags = CLONE_NEWNS | SIGCHLD | arg.clone_flags;
 
@@ -517,7 +520,71 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     void * stack = (void*)((char*)alloca(stack_size) + stack_size);
     char buf[] = "RUN";
 
-    INFO("clone flags = 0x%x", (int)clone_flags);
+    if (DEBUG) {
+        int v = clone_flags;
+        string s;
+        #define TEST_FLAG(x) if ((v & x) != 0) { s += string(# x) + " | "; v ^= x; }
+        TEST_FLAG(CLONE_VM);
+        TEST_FLAG(CLONE_FS);
+        TEST_FLAG(CLONE_FILES);
+        TEST_FLAG(CLONE_SIGHAND);
+        TEST_FLAG(CLONE_PTRACE);
+        TEST_FLAG(CLONE_VFORK);
+        TEST_FLAG(CLONE_PARENT);
+        TEST_FLAG(CLONE_THREAD);
+        TEST_FLAG(CLONE_NEWNS);
+        TEST_FLAG(CLONE_SYSVSEM);
+        TEST_FLAG(CLONE_SETTLS);
+        TEST_FLAG(CLONE_PARENT_SETTID);
+        TEST_FLAG(CLONE_CHILD_CLEARTID);
+        TEST_FLAG(CLONE_DETACHED);
+        TEST_FLAG(CLONE_UNTRACED);
+        TEST_FLAG(CLONE_CHILD_SETTID);
+        TEST_FLAG(CLONE_NEWUTS);
+        TEST_FLAG(CLONE_NEWIPC);
+        TEST_FLAG(CLONE_NEWUSER);
+        TEST_FLAG(CLONE_NEWPID);
+        TEST_FLAG(CLONE_NEWNET);
+        TEST_FLAG(CLONE_IO);
+        TEST_FLAG(SIGCHLD);
+
+        TEST_FLAG(SIGINT);
+        TEST_FLAG(SIGQUIT);
+        TEST_FLAG(SIGILL);
+        TEST_FLAG(SIGTRAP);
+        TEST_FLAG(SIGABRT);
+        TEST_FLAG(SIGIOT);
+        TEST_FLAG(SIGBUS);
+        TEST_FLAG(SIGFPE);
+        TEST_FLAG(SIGKILL);
+        TEST_FLAG(SIGUSR1);
+        TEST_FLAG(SIGSEGV);
+        TEST_FLAG(SIGUSR2);
+        TEST_FLAG(SIGPIPE);
+        TEST_FLAG(SIGALRM);
+        TEST_FLAG(SIGTERM);
+        TEST_FLAG(SIGSTKFLT);
+        TEST_FLAG(SIGCLD);
+        TEST_FLAG(SIGCHLD);
+        TEST_FLAG(SIGCONT);
+        TEST_FLAG(SIGSTOP);
+        TEST_FLAG(SIGTSTP);
+        TEST_FLAG(SIGTTIN);
+        TEST_FLAG(SIGTTOU);
+        TEST_FLAG(SIGURG);
+        TEST_FLAG(SIGXCPU);
+        TEST_FLAG(SIGXFSZ);
+        TEST_FLAG(SIGVTALRM);
+        TEST_FLAG(SIGPROF);
+        TEST_FLAG(SIGWINCH);
+        TEST_FLAG(SIGPOLL);
+        TEST_FLAG(SIGIO);
+        TEST_FLAG(SIGPWR);
+        TEST_FLAG(SIGSYS);
+        TEST_FLAG(SIGUNUSED);
+        #undef TEST_FLAG
+        INFO("clone flags = 0x%x = %s0x%x", (int)clone_flags, s.c_str(), v);
+    }
 
     pid_t child_pid;
     child_pid = clone(clone_fn, stack, clone_flags, &arg);

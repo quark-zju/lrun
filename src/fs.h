@@ -24,6 +24,7 @@
 
 #include <string>
 #include <sys/stat.h>
+#include <sys/mount.h>
 
 namespace lrun {
     namespace fs {
@@ -32,6 +33,7 @@ namespace lrun {
          * Typically, it is "/proc/mounts"
          */
         extern const char * const MOUNTS_PATH;
+        extern const char * const PROC_PATH;
 
         /**
          * Cgroup filesystem type name: "cgroup"
@@ -107,9 +109,18 @@ namespace lrun {
          * @param   dest        target path
          * @param   max_size    size in bytes, note that this can be rounded to block size
          * @reutrn  0           success
-         *         <0           failed
+         *          other       failed
          */
         int mount_tmpfs(const std::string& dest, size_t max_size, mode_t mode = 0777);
+
+        /**
+         * mount --make-*
+         * @param   dest        target path
+         * @param   type        (MS_SLAVE | MS_PRIVATE | MS_SHARED) | [MS_REC]
+         * @return  0           success
+         *          other       failed
+         */
+        int mount_set_shared(const std::string& dest, int type = MS_SLAVE);
 
         /**
          * umount

@@ -329,7 +329,7 @@ int main(int argc, char * argv[]) {
     INFO("pid = %d", (int)getpid());
 
     // pick an unique name and create a cgroup in filesystem
-    string group_name = "ze" + strconv::from_long((long)getpid());
+    string group_name = "lrun" + strconv::from_long((long)getpid());
     Cgroup cg = Cgroup::create(group_name);
 
     if (!cg.valid()) FATAL("can not create cgroup '%s'", group_name.c_str());
@@ -368,6 +368,8 @@ int main(int argc, char * argv[]) {
     //         clean_cg_exit(cg);
     //     }
     // }
+
+    // Detect shared mounts
 
     // reset cpu / memory usage and killall existing processes
     // not needed if cg can be guarnteed that is newly created
