@@ -105,7 +105,7 @@ h2. Mount tmpfs
 % lrun ls /usr
 NX  bin  i486-mingw32  include	lib  lib32  local  man	sbin  share  src  x86_64-unknown-linux-gnu
 
-% lrun --tmpfs /usr 40960 df /usr
+% lrun --tmpfs /var 40960 df /var
 Filesystem     1K-blocks  Used Available Use% Mounted on
 none                  40     0        40   0% /usr
 
