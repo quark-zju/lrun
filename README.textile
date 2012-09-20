@@ -2,7 +2,7 @@ Run command on Linux with resources limited.
 
 h1. Dependencies
 
-* Linux kernel >= 2.6.26, you can check kernel config by @scripts/check_linux_config.rb@
+* Linux kernel >= 2.6.26, you can check kernel config by @utils/check_linux_config.rb@
 * g++, 4.4 should work, 4.6 and above recommended
 
 h1. Installation
