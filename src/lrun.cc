@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/resource.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -84,6 +85,7 @@ static void print_help() {
             "  --chroot          path        Chroot to specified path before exec.\n"
             "  --chdir           path        Chdir to specified path after chroot.\n"
             "  --nice            nice        Add nice with specified value.\n"
+            "  --umask           int         Set umask.\n"
             "  --uid             uid         Set uid to specified uid (uid > 0).\n"
             "  --gid             gid         Set gid to specified gid (gid > 0).\n"
             "  --interval        seconds     Set interval status update interval.\n"
@@ -146,6 +148,7 @@ static void parse_options(int argc, char * argv[]) {
     config.arg.nice = 0;
     config.arg.uid = getuid() > 0 ? getuid() : (uid_t)2000;
     config.arg.gid = getgid() > 0 ? getgid() : (gid_t)200;
+    config.arg.umask = 022;
     config.arg.chroot_path = "";
     config.arg.chdir_path = "";
     config.arg.args = argv + 1;
@@ -222,6 +225,9 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "nice") {
             REQUIRE_NARGV(1);
             config.arg.nice = (int)NEXT_LONG_LONG_ARG;
+        } else if (option == "umask") {
+            REQUIRE_NARGV(1);
+            config.arg.umask = (mode_t)NEXT_LONG_LONG_ARG;
         } else if (option == "uid") {
             REQUIRE_NARGV(1);
             uid_t uid = (uid_t)NEXT_LONG_LONG_ARG;

@@ -427,6 +427,9 @@ static int clone_fn(void * clone_arg) {
         nice(arg.nice);
     }
 
+    // set umask
+    umask(arg.umask);
+
     // setup uid, gid
     INFO("setgid %d, setuid %d", (int)arg.gid, (int)arg.uid);
     if (setgid(arg.gid) || setuid(arg.uid)) {

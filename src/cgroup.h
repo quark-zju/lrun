@@ -191,6 +191,7 @@ namespace lrun {
                 char * const * args;        // exec args
                 uid_t uid;                  // uid (should not be 0)
                 gid_t gid;                  // gid (should not be 0)
+                mode_t umask;               // umask
                 int nice;                   // nice
                 int sockets[2];             // for sync between child and parent
                 std::string chroot_path;    // chroot path, empty if not need to chroot
