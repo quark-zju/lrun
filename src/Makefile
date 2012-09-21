@@ -1,6 +1,6 @@
 BINARIES=lrun
 OBJECTS=lrun.o strconv.o fs.o cgroup.o macros.o
-CXXFLAGS=-O2 -std=c++0x -Wall
+CXXFLAGS=-g -O2 -std=c++0x -Wall
 LDFLAGS=
 LD=g++
 PREFIX?=/usr/local

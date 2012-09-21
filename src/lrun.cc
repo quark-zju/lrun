@@ -71,8 +71,8 @@ static void print_help() {
             "  --max-real-time   seconds     Limit real time, seconds can be rational.\n"
             "  --max-memory      bytes       Limit memory (+swap) usage in bytes.\n"
             "                                This value should not be too small.\n"
-            "  --max-output      bytes       Limit output. Note: output limit is not\n"
-            "                                very accurate.\n"
+            "  --max-output      kbytes      Limit output. Note: write to /dev/null\n"
+            "                                is counted and the limit is NOT accurate.\n"
             "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n"
             "                                is not seperated, current processes are\n"
             "                                counted. Set uid to resolve this issue.\n"
@@ -194,7 +194,7 @@ static void parse_options(int argc, char * argv[]) {
             config.memory_limit = NEXT_LONG_LONG_ARG;
         } else if (option == "max-output") {
             REQUIRE_NARGV(1);
-            config.output_limit = NEXT_LONG_LONG_ARG;
+            config.output_limit = NEXT_LONG_LONG_ARG * 1000LL;
         } else if (option == "max-nprocess") {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NPROC] = NEXT_LONG_LONG_ARG;
@@ -323,7 +323,7 @@ static double now() {
 }
 #endif
 
-static void clean_cg_exit(Cgroup& cg, int exit_code = 2) {
+static void clean_cg_exit(Cgroup& cg, int exit_code) {
     INFO("cleaning and exiting with code = %d", exit_code);
 
     if (config.cgname.empty()) {
@@ -380,7 +380,7 @@ int main(int argc, char * argv[]) {
     if (config.memory_limit > 0) {
         if (cg.set_memory_limit(config.memory_limit)) {
             ERROR("can not set memory limit");
-            clean_cg_exit(cg, 1);
+            clean_cg_exit(cg, 2);
         }
     }
 
@@ -406,12 +406,12 @@ int main(int argc, char * argv[]) {
     // not needed if cg can be guarnteed that is newly created
     if (cg.killall()) {
         ERROR("can not stop running processes in group.");
-        clean_cg_exit(cg, 1);
+        clean_cg_exit(cg, 3);
     }
 
     if (cg.reset_usages()) {
         ERROR("can not reset cpu time / memory usage counter.");
-        clean_cg_exit(cg, 1);
+        clean_cg_exit(cg, 4);
     }
 
     // fd 3 should not be inherited by child process
@@ -419,7 +419,7 @@ int main(int argc, char * argv[]) {
         // ignore bad fd error
         if (errno != EBADF) {
             ERROR("can not set FD_CLOEXEC on fd 3");
-            clean_cg_exit(cg, 1);
+            clean_cg_exit(cg, 5);
         }
     }
 
@@ -437,13 +437,6 @@ int main(int argc, char * argv[]) {
     if (config.enable_user_proc_namespace) clone_flags |= CLONE_NEWPID | CLONE_NEWIPC;
     config.arg.clone_flags = clone_flags;
 
-    pid = cg.spawn(config.arg);
-
-    if (pid <= 0) {
-        // error messages are printed before
-        clean_cg_exit(cg, -pid);
-    }
-
     // no sigpipe
     signal(SIGPIPE, SIG_IGN);
     signal(SIGALRM, SIG_IGN);
@@ -457,6 +450,14 @@ int main(int argc, char * argv[]) {
     signal(SIGFPE, signal_handler);
     signal(SIGILL, signal_handler);
     signal(SIGTRAP, signal_handler);
+
+    pid = cg.spawn(config.arg);
+
+    if (pid <= 0) {
+        // error messages are printed before
+        clean_cg_exit(cg, 10 - pid);
+    }
+
 
     // monitor its cpu_usage and real time usage and memory usage
     double start_time = now();
@@ -518,7 +519,7 @@ int main(int argc, char * argv[]) {
             e = waitpid(pid, &stat, WNOHANG);
             if (e == -1) {
                 // something goes wrong, give up
-                clean_cg_exit(cg, 4);
+                clean_cg_exit(cg, 6);
             }
         }
 

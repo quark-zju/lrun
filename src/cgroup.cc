@@ -457,6 +457,7 @@ static int clone_fn(void * clone_arg) {
     }
 
     // set umask
+    INFO("umask %d", arg.umask);
     umask(arg.umask);
 
     // setup uid, gid
@@ -535,9 +536,14 @@ static int clone_fn(void * clone_arg) {
 
     // not closing sockets[0] here, it will closed on exec
     // if exec fails, it will be closed upon process exit (aka. this function returns)
+    if (fcntl(arg.sockets[0], F_SETFD, FD_CLOEXEC)) {
+        FATAL("fcntl failed");
+        return -1;
+    }
 
     // exec target
     INFO("execvp %s ...", arg.args[0]);
+
     execvp(arg.args[0], arg.args);
 
     // exec failed, store errno
@@ -667,22 +673,22 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
     // child is blocking, waiting us before exec, let it go
     close(arg.sockets[0]);
-    write(arg.sockets[1], buf, sizeof buf);
+    send(arg.sockets[1], buf, sizeof buf, MSG_NOSIGNAL);
 
     // wait for child response
     INFO("reading from child");
     read(arg.sockets[1], buf, sizeof buf);
     INFO("from child, got '%3s'", buf);
     if (buf[0] != 'P') {
-        // child has problem
-        WARNING("child does not work as expected (buf = '%s')", buf);
+        // child has problem to start
+        child_pid = -3;
         goto cleanup;
     }
 
     // child exec may fail, confirm
     if (read(arg.sockets[1], buf, sizeof buf) > 0 && buf[0] == 'E') {
         INFO("seems child exec failed");
-        child_pid = -3;
+        child_pid = -4;
     } else {
         // disable oom killer now
         // oom killer writes a super long log, disable it
