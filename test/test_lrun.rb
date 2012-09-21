@@ -1,5 +1,8 @@
 require 'minitest/autorun'
-require 'purdytest' rescue nil
+begin
+  require 'purdytest'
+rescue LoadError
+end
 require 'lrun'
 require 'fileutils'
 
