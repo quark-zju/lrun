@@ -5,7 +5,7 @@ class Lrun::RestrictedRunner < Lrun::Runner
   LOCAL_OPTIONS = {
       network: false, basic_devices: true, isolate_process: true, 
       max_nprocess: 2048, max_nfile: 256, umask: 022,
-      max_nice: 2, nice: 2, max_rtprio: 1,
+      max_nice: 2, nice: 2, max_rtprio: 0,
   }
 
   def run(commands, opt = nil)
