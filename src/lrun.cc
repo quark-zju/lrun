@@ -123,7 +123,7 @@ static void print_help() {
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
             "       --reset-env false --interval 0.05 \\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
-            "       --min-nice 0 --max-rtprio 1 \\\n"
+            "       --min-nice 0 --max-rtprio 0 \\\n"
             "       --uid $UID --gid $GID\n"
             "\n"
            );
@@ -161,7 +161,7 @@ static void parse_options(int argc, char * argv[]) {
     config.arg.rlimits[RLIMIT_NICE] = 20 - 0;
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
     config.arg.rlimits[RLIMIT_NPROC] = 2048;
-    config.arg.rlimits[RLIMIT_RTPRIO] = 1;
+    config.arg.rlimits[RLIMIT_RTPRIO] = 0;
     config.arg.reset_env = 0;
 
     // parse commandline options
