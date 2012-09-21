@@ -1,7 +1,13 @@
-*/*
-!*.c
-!*.cc
-!*.h
-!*.rb
-!Makefile
+# no object files
+*.o
 
+# no hidden files/directories
+.*
+
+# no kdevelop project files
+*.kdev4
+
+# no binaries
+test/[a-z_]*
+src/[a-z_]*
+utils/[a-z_]*
