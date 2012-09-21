@@ -71,7 +71,7 @@ static void print_help() {
             "  --max-real-time   seconds     Limit real time, seconds can be rational.\n"
             "  --max-memory      bytes       Limit memory (+swap) usage in bytes.\n"
             "                                This value should not be too small.\n"
-            "  --max-output      kbytes      Limit output. Note: write to /dev/null\n"
+            "  --max-output      bytes       Limit output. Note: write to /dev/null\n"
             "                                is counted and the limit is NOT accurate.\n"
             "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n"
             "                                is not seperated, current processes are\n"
@@ -191,10 +191,16 @@ static void parse_options(int argc, char * argv[]) {
             config.real_time_limit = NEXT_DOUBLE_ARG;
         } else if (option == "max-memory") {
             REQUIRE_NARGV(1);
-            config.memory_limit = NEXT_LONG_LONG_ARG;
+            long long max_memory = NEXT_LONG_LONG_ARG;
+            static const long long MIN_MEMORY_LIMIT = 500000LL;
+            if (max_memory > 0 && max_memory < MIN_MEMORY_LIMIT) {
+                WARNING("max-memory too small, changed to %lld.", MIN_MEMORY_LIMIT);
+                max_memory = MIN_MEMORY_LIMIT;
+            }
+            config.memory_limit = max_memory;
         } else if (option == "max-output") {
             REQUIRE_NARGV(1);
-            config.output_limit = NEXT_LONG_LONG_ARG * 1000LL;
+            config.output_limit = NEXT_LONG_LONG_ARG;
         } else if (option == "max-nprocess") {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NPROC] = NEXT_LONG_LONG_ARG;
