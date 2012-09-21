@@ -3,6 +3,13 @@ require 'purdytest' rescue nil
 require 'lrun/runner'
 require 'fileutils'
 
+# need File.write
+unless File.respond_to?(:write)
+  def File.write f, s
+    File.open(f, 'w') { |f| f.write s }
+  end
+end
+
 class TestLrunRunner < MiniTest::Unit::TestCase
 
   def l(*opts)
