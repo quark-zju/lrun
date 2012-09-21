@@ -1,8 +1,7 @@
 */*
-!*/*.c
-!*/*.cc
-!*/*.h
-!*/*.rb
-!*/Makefile
-b*/
+!*.c
+!*.cc
+!*.h
+!*.rb
+!Makefile
 
