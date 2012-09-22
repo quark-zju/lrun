@@ -204,7 +204,7 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "max-nprocess") {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NPROC] = NEXT_LONG_LONG_ARG;
-        } else if (option == "max-nice") {
+        } else if (option == "min-nice") {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NICE] = NEXT_LONG_LONG_ARG;
         } else if (option == "max-rtprio") {
