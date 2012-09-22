@@ -44,7 +44,7 @@ class Lrun::Runner
   end
 
   def run(commands, opt = nil)
-    @runner.run commands, merge_options(opt)
+    @runner.run commands, merge_options(options, opt)
   end
 
   # decorators
