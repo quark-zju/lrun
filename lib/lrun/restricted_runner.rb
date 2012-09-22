@@ -25,13 +25,20 @@ require 'lrun/runner'
 class Lrun::RestrictedRunner < Lrun::Runner
 
   LOCAL_OPTIONS = {
-      network: false, basic_devices: true, isolate_process: true, 
-      max_nprocess: 2048, max_nfile: 256, umask: 022,
-      max_nice: 2, nice: 2, max_rtprio: 0,
+    network: false, basic_devices: true, isolate_process: true, 
+    max_nprocess: 2048, max_nfile: 256, umask: 022,
+    min_nice: 2, nice: 2, max_rtprio: 0,
+  }
+
+  DEFAULT_LIMIT_OPTIONS = {
+    max_memory:    1024 ** 3,      # 1G
+    max_output:    16 * 1024 ** 2, # 16MB
+    max_cpu_time:  5,              # 5 seconds
+    max_real_time: 5,              # 5 seconds
   }
 
   def run(commands, opt = nil)
-    @runner.run commands, Lrun.merge_options(options, opt, LOCAL_OPTIONS)
+    @runner.run commands, Lrun.merge_options(DEFAULT_LIMIT_OPTIONS, options, opt, LOCAL_OPTIONS)
   end
 
 end

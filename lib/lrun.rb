@@ -21,7 +21,8 @@
 ################################################################################
 
 require 'tempfile'
-
+require 'shellwords'
+require 'logger'
 
 module Lrun
   LRUN_BINARY = 'lrun'
@@ -62,6 +63,8 @@ module Lrun
   
   DEFAULT_TRUNCATE = 4096
 
+  @@logger = nil
+
   # memory:   bytes
   # time:     seconds
   # exceed:   nil || :time || :memory
@@ -70,6 +73,14 @@ module Lrun
   # stdout:   nil || string
   # stderr:   nil || string
   Result = Struct.new(:memory, :cputime, :exceed, :exitcode, :signal, :stdout, :stderr)
+
+  def self.logger
+    @@logger
+  end
+
+  def self.logger=(logger)
+    @@logger = logger
+  end
 
   def self.merge_options(*opts)
     # make things little faster
@@ -112,13 +123,16 @@ module Lrun
                                           3 => w3.fileno})
       [w3].each(&:close)
       
+      log { "RUN #{Shellwords.shelljoin(command_line)} " "(OPT = #{opt.reject{|k,v| LRUN_OPTIONS[k]}})" }
+
       report = Hash[r3.lines.map{|l| l.chomp.split(' ', 2)}]
 
       stat = Process.wait2(pid)[-1]
-      [r3].each {|io| io.close unless io.closed?}
+
+      log { "GOT #{report.map{|k,v|"#{k}:#{v}"}.join(' ')}" }
 
       if stat.signaled? || stat.exitstatus != 0
-        require 'shellwords'
+        log(Logger::ERROR) { "lrun returns #{stat}" }
         raise RuntimeError.new("#{Shellwords.shelljoin command_line} (#{stat}) #{stderr.read}")
       end
 
@@ -167,6 +181,11 @@ module Lrun
          e.to_s
        end
     end.reject(&:empty?)
+  end
+
+  def self.log(level = Logger::INFO)
+    return unless @@logger
+    @@logger.log level, yield.to_s
   end
 
 end

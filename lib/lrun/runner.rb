@@ -67,7 +67,9 @@ class Lrun::Runner
   def chain(new_options)
     # avoid Lrun.merge_options to make repeatable option 
     # overrideable. avoid delegate to be faster.
-    self.class.new Hash[[*@options, *new_options]]
+    ret = self.clone
+    ret.options = Hash[[*@options, *new_options]]
+    ret
   end
 
 end
