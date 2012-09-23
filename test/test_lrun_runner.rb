@@ -150,7 +150,9 @@ class TestLrunRunner < MiniTest::Unit::TestCase
 
     in_path = File.join(tmp_dir, 'input')
     out_path = File.join(tmp_dir, 'output')
+
     File.write(in_path, [*1..10].join("\n"))
+
     run_c_code 's;i;main(){for(;scanf("%d",&i)==1;)s+=i;printf("%d",s);exit(0);}', in: in_path, out: out_path, err: :close
 
     assert_equal 55, File.read(out_path).to_i
@@ -166,33 +168,40 @@ class TestLrunRunner < MiniTest::Unit::TestCase
   end
 
   def test_badprog_forkforever
+    prepare_tmpdir
     r = run_bad_c_code('main() { for(;;)fork();}')
     assert [:time, :memory].include?(r.exceed)
   end
 
   def test_badprog_overflow
+    prepare_tmpdir
     r = run_bad_c_code('i;c;main(ac,av) { int *j;for(;j=(int*)malloc(4096000);){ for(i=0;i<1024;++i)j[i*999]=i+ac;printf("%d MB\n", ++c * 4); } }')
     assert_equal r.exceed, :memory
   end
 
   def test_badprog_return3
+    prepare_tmpdir
     assert_equal 3, run_bad_c_code('main() { return 3; }').exitcode
   end
 
   def test_badprog_runforever
+    prepare_tmpdir
     assert_equal :time, run_bad_c_code('main() { while(1); }').exceed
   end
 
   def test_badprog_sleepforever
+    prepare_tmpdir
     assert_equal :time, run_bad_c_code('main() { while(1) sleep(1); }').exceed
   end
 
   def test_badprog_sigfpe
+    prepare_tmpdir
     r = run_bad_c_code('main(ac,av) { printf("%d", ac / (ac * 0)); return 0; }')
     assert Signal.list["FPE"], r.signal
   end
 
   def test_badprog_sigsegv
+    prepare_tmpdir
     r = run_bad_c_code('main(ac,av) { ((int*)main)[1+ac] = 2; return 0; }')
     assert Signal.list["SEGV"], r.signal
   end
