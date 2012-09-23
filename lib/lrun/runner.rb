@@ -62,8 +62,6 @@ class Lrun::Runner
     @runner.merge_options(@options, *opts)
   end
 
-  private
-
   def chain(new_options)
     # avoid Lrun.merge_options to make repeatable option 
     # overrideable. avoid delegate to be faster.

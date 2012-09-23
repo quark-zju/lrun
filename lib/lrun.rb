@@ -65,6 +65,10 @@ module Lrun
 
   @@logger = nil
 
+  class LrunError < RuntimeError
+
+  end
+
   # memory:   bytes
   # time:     seconds
   # exceed:   nil || :time || :memory
@@ -72,7 +76,11 @@ module Lrun
   # signal:   nil || int
   # stdout:   nil || string
   # stderr:   nil || string
-  Result = Struct.new(:memory, :cputime, :exceed, :exitcode, :signal, :stdout, :stderr)
+  class Result < Struct.new(:memory, :cputime, :exceed, :exitcode, :signal, :stdout, :stderr)
+    def clean?
+      signal.nil? && exitcode.to_i == 0
+    end
+  end
 
   def self.logger
     @@logger
@@ -133,7 +141,7 @@ module Lrun
 
       if stat.signaled? || stat.exitstatus != 0
         log(Logger::ERROR) { "lrun returns #{stat}" }
-        raise RuntimeError.new("#{Shellwords.shelljoin command_line} (#{stat}) #{stderr.read}")
+        raise LrunError.new("#{Shellwords.shelljoin command_line} (#{stat}) #{stderr.read}")
       end
 
       exceed = case report['EXCEED']
