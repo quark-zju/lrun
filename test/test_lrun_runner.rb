@@ -159,11 +159,15 @@ class TestLrunRunner < MiniTest::Unit::TestCase
   end
 
   def test_complex_rofs
+    prepare_tmpdir
+
     assert_equal true, (b.run("#!/bin/bash\n/bin/ls -d /proc/[0-9]* | wc -l").stdout.to_i <= 3)
     assert_equal 0, b.run("#!/bin/bash\n/bin/ls -d /rofs /var /sys | wc -l").stdout.to_i
   end
 
   def test_script
+    prepare_tmpdir
+
     assert_equal 'hello', b.run("#!/usr/bin/env ruby\nputs :hello").stdout.chomp
   end
 
