@@ -4,6 +4,7 @@ h1. Dependencies
 
 * Linux kernel >= 2.6.26, you can check kernel config by @utils/check_linux_config.rb@
 * g++, 4.4 should work, 4.6 and above recommended
+* (Optionally) libsecomp ~= 1.0.0 and Linux kernel >= 3.5, to use syscall whitelist / blacklist
 
 h1. Installation
 
@@ -120,10 +121,32 @@ TERMSIG  0
 EXCEED   none
 </pre>
 
-h2. Verbose mode
+h2. Syscall filter
 
-Setting @DEBUG=1@ enables verbose mode:
+This requires kernel >= 3.5 and libseccomp (at both compile and run time).
 
 <pre>
-% DEBUG=1 lrun --network true --reset-env false firefox
+% lrun --syscalls '!write' readlink /lib
+usr/lib
 </pre>
+
+<pre>
+% lrun --syscalls '!readlink' readlink /lib 3>&1
+MEMORY   262144
+CPUTIME  0.000
+REALTIME 0.070
+SIGNALED 0
+EXITCODE 1
+TERMSIG  0
+EXCEED   none
+</pre>
+
+h2. Realtime status
+
+Use `--status` to show realtime cpu, memory usage information:
+
+<pre>
+% lrun --status firefox
+</pre>
+
+
