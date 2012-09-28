@@ -325,7 +325,13 @@ double Cgroup::cpu_usage() const {
     return strconv::to_double(cpu_usage) / 1e9;
 }
 
-long long Cgroup::memory_usage() const {
+long long Cgroup::memory_current() const {
+    string usage = get(CG_MEMORY, "memory.memsw.usage_in_bytes");
+    if (usage.empty()) usage = get(CG_MEMORY, "memory.usage_in_bytes");
+    return strconv::to_longlong(usage);
+}
+
+long long Cgroup::memory_peak() const {
     string usage = get(CG_MEMORY, "memory.memsw.max_usage_in_bytes");
     if (usage.empty()) usage = get(CG_MEMORY, "memory.max_usage_in_bytes");
     return strconv::to_longlong(usage);

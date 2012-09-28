@@ -105,6 +105,8 @@ static void print_help() {
             "                                not set, lrun will pick an unique cgroup name \n"
             "                                and destroy the cgroup upon exit.\n"
             "  --interval        seconds     Set interval status update interval.\n"
+            "  --debug                       Print debug messages.\n"
+            "  --status                      Show realtime resource usage status.\n"
             "  --help                        Show this help.\n"
             "  --version                     Show version information.\n"
             "\n"
@@ -315,6 +317,14 @@ static void parse_options(int argc, char * argv[]) {
             print_help();
         } else if (option == "version") {
             print_version();
+        } else if (option == "debug") {
+            DEBUG_ENABLED = 1;
+            DEBUG_PID = 1;
+            DEBUG_TIMESTAMP = 1;
+            DEBUG_PROGRESS = 0;
+            DEBUG_START_TIME = now();
+        } else if (option == "status") {
+            DEBUG_PROGRESS = 1;
         } else if (option == "") {
             if (i + 1 >= argc) print_help();
             config.arg.args = argv + i + 1;
@@ -535,7 +545,7 @@ int main(int argc, char * argv[]) {
 
         // check memory limit
         long long memory_limit = cg.memory_limit();
-        if (cg.memory_usage() >= memory_limit && memory_limit > 0) {
+        if (cg.memory_peak() >= memory_limit && memory_limit > 0) {
             exceeded_limit = "MEMORY";
             break;
         }
@@ -563,11 +573,11 @@ int main(int argc, char * argv[]) {
                 break;
             }
 
-            PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2fM | OUT %LdB",
-            cg.cpu_usage(), now() - start_time, cg.memory_usage() / 1.e6, output_bytes);
+            PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2f / %4.2fM | OUT %LdB",
+            cg.cpu_usage(), now() - start_time, cg.memory_current() / 1.e6, cg.memory_peak() / 1.e6, output_bytes);
         } else {
-            PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2fM",
-            cg.cpu_usage(), now() - start_time, cg.memory_usage() / 1.e6);
+            PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2f / %4.2fM",
+            cg.cpu_usage(), now() - start_time, cg.memory_current() / 1.e6, cg.memory_peak() / 1.e6);
         }
 
         // sleep for a while
@@ -577,7 +587,7 @@ int main(int argc, char * argv[]) {
     PROGRESS_INFO("\nOUT OF RUNNING LOOP\n");
 
     // collect stats
-    long long memory_usage = cg.memory_usage();
+    long long memory_usage = cg.memory_peak();
     if (config.memory_limit > 0 && memory_usage >= config.memory_limit) {
         memory_usage = config.memory_limit;
         exceeded_limit = "MEMORY";

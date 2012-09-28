@@ -35,10 +35,12 @@ class DebugEnvDetector {
     DebugEnvDetector() {
         if (getenv("DEBUG") != 0) {
             ::DEBUG_ENABLED = 1;
-            ::DEBUG_PID = readEnvBool("DEBUG_PID");
-            ::DEBUG_TIMESTAMP = readEnvBool("DEBUG_TIMESTAMP");
-            ::DEBUG_PROGRESS = readEnvBool("DEBUG_PROGRESS");
             ::DEBUG_START_TIME = NOW;
+            ::DEBUG_PID = readEnvBool("DEBUG_PID");
+            ::DEBUG_PROGRESS = readEnvBool("DEBUG_PROGRESS");
+            ::DEBUG_TIMESTAMP = readEnvBool("DEBUG_TIMESTAMP");
+        } else {
+            ::DEBUG_PROGRESS = readEnvBool("DEBUG_PROGRESS", 0);
         }
     }
 

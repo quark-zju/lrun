@@ -156,10 +156,16 @@ namespace lrun {
             int killall();
 
             /**
-             * get memory usage
+             * get current memory usage
              * @return  memory usage in bytes
              */
-            long long memory_usage() const;
+            long long memory_current() const;
+
+            /**
+             * get peak memory usage
+             * @return  memory usage in bytes
+             */
+            long long memory_peak() const;
 
             /**
              * get memory limit
