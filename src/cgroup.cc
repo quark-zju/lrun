@@ -542,7 +542,10 @@ static int clone_fn(void * clone_arg) {
     }
 
     // syscall whitelist
-    seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action);
+    if (seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
+        FATAL("seccomp failed");
+        return -1;
+    }
 
     // exec target
     INFO("execvp %s ...", arg.args[0]);

@@ -265,9 +265,9 @@ static void parse_options(int argc, char * argv[]) {
 
             config.arg.syscall_action = seccomp::action_t::DEFAULT_EPERM;
             switch (syscalls.data()[0]) {
-                case '!':
+                case '!': case '-':
                     config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
-                case '=':
+                case '=': case '+':
                     config.arg.syscall_list = string(syscalls.data() + 1);
                     break;
                 default:

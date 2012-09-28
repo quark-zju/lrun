@@ -11,3 +11,9 @@
 test/[a-z_]*
 src/[a-z_]*
 utils/[a-z_]*
+
+# include sources
+!*.cc
+!*.h
+!*.rb
+!Makefile
