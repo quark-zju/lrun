@@ -30,12 +30,13 @@
 # define _GNU_SOURCE 1
 #endif
 
-#define VERSION "0.9.4.0"
+#define VERSION "0.9.4.1"
 
 #include <cstdio>
 #include <cstdlib>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
 #ifdef __cplusplus
 extern "C" {

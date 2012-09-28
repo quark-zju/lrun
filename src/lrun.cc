@@ -91,12 +91,20 @@ static void print_help() {
             "  --umask           int         Set umask.\n"
             "  --uid             uid         Set uid to specified uid (uid > 0).\n"
             "  --gid             gid         Set gid to specified gid (gid > 0).\n"
-            "  --interval        seconds     Set interval status update interval.\n"
+            "  --syscalls        syscalls    Set syscall whitelist or blacklist.\n"
+            "                                `syscalls` is a string starts with '!'\n"
+            "                                or (optional) '='. Then a list of \n"
+            "                                syscall names separated by ','.\n"
+            "                                If `syscalls` starts with '!', it is a \n"
+            "                                blacklist, otherwise whitelist.\n"
+            "                                Note: you should make sure at least \n"
+            "                                execve can be used.\n"
             "  --cgname          string      Specify cgroup name to use.\n"
             "                                Specified cgroup will be created on demand, \n"
             "                                and will not be deleted. If this option is \n"
             "                                not set, lrun will pick an unique cgroup name \n"
             "                                and destroy the cgroup upon exit.\n"
+            "  --interval        seconds     Set interval status update interval.\n"
             "  --help                        Show this help.\n"
             "  --version                     Show version information.\n"
             "\n"
@@ -125,6 +133,7 @@ static void print_help() {
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
             "       --min-nice 0 --max-rtprio 0 \\\n"
             "       --uid $UID --gid $GID\n"
+            "       --syscalls !\n"
             "\n"
            );
     exit(0);
@@ -163,6 +172,8 @@ static void parse_options(int argc, char * argv[]) {
     config.arg.rlimits[RLIMIT_NPROC] = 2048;
     config.arg.rlimits[RLIMIT_RTPRIO] = 0;
     config.arg.reset_env = 0;
+    config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
+    config.arg.syscall_list = "";
 
     // parse commandline options
 #define REQUIRE_NARGV(n) \
@@ -248,6 +259,20 @@ static void parse_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             gid_t gid = (gid_t)NEXT_LONG_LONG_ARG;
             if (gid != 0) config.arg.gid = gid;
+        } else if (option == "syscalls") {
+            REQUIRE_NARGV(1);
+            string syscalls = NEXT_STRING_ARG;
+
+            config.arg.syscall_action = seccomp::action_t::DEFAULT_EPERM;
+            switch (syscalls.data()[0]) {
+                case '!':
+                    config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
+                case '=':
+                    config.arg.syscall_list = string(syscalls.data() + 1);
+                    break;
+                default:
+                    config.arg.syscall_list = syscalls;
+            }
         } else if (option == "group") {
             REQUIRE_NARGV(1);
             gid_t gid = (gid_t)NEXT_LONG_LONG_ARG;
