@@ -30,10 +30,6 @@
 # define _GNU_SOURCE 1
 #endif
 
-#ifndef _BSD_SOURCE
-# define _BSD_SOURCE 1
-#endif
-
 #define VERSION "0.9.4.1"
 
 #include <cstdio>
