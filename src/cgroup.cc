@@ -51,6 +51,13 @@ const char Cgroup::subsys_names[4][8] = {
 
 std::string Cgroup::subsys_base_paths_[sizeof(subsys_names) / sizeof(subsys_names[0])];
 
+int Cgroup::subsys_id_from_name(const char * const name) {
+    for (size_t i = 0; i < sizeof(subsys_names) / sizeof(subsys_names[0]); ++i) {
+        if (strcmp(name, subsys_names[i])) return i;
+    }
+    return -1;
+}
+
 string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
     {
         // FIXME cache may not work when user manually umount cgroup

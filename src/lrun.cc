@@ -117,7 +117,8 @@ static void print_help() {
             "                                hide filesystem subtree. size is in bytes.\n"
             "                                If bytes is 0, mount read-only.\n"
             "                                This is performed after chroot.\n"
-            // "  --cgroup-option   key value   Apply cgroup setting before exec.\n"
+            "  --cgroup-option   subsys key value\n"
+            "                                Apply cgroup setting before exec.\n"
             "  --env             key value   Set environment variable before exec.\n"
             "  --fd              n           Do not close fd n.\n"
             "  --group           gid         Set additional groups.\n"
@@ -296,11 +297,19 @@ static void parse_options(int argc, char * argv[]) {
             string path = NEXT_STRING_ARG;
             long long bytes = NEXT_LONG_LONG_ARG;
             config.arg.tmpfs_list.push_back(make_pair(path, bytes));
-        // } else if (option == "cgroup-option") {
-        //     REQUIRE_NARGV(2);
-        //     string key = NEXT_STRING_ARG;
-        //     string value = NEXT_STRING_ARG;
-        //     config.cgroup_options[key] = value;
+        } else if (option == "cgroup-option") {
+            REQUIRE_NARGV(3);
+            string subsys_name = NEXT_STRING_ARG;
+            string key = NEXT_STRING_ARG;
+            string value = NEXT_STRING_ARG;
+            int subsys_id = Cgroup::subsys_id_from_name(subsys_name.c_str());
+            if (subsys_id >= 0) {
+                config.cgroup_options[make_pair((Cgroup::subsys_id_t)subsys_id, key)] = value;
+            } else {
+                WARNING("cgroup option '%s' = '%s' ignored:"
+                        "subsystem '%s' not found",
+                        key.c_str(), value.c_str(), subsys_name.c_str());
+            }
         } else if (option == "env") {
             REQUIRE_NARGV(2);
             string key = NEXT_STRING_ARG;
@@ -433,13 +442,13 @@ int main(int argc, char * argv[]) {
     cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "0\n");
 
     // other cgroup options
-    // for (auto it = config.cgroup_options.begin(); it != config.cgroup_options.end(); ++it) {
-    //     auto& p = (*it);
-    //     if (cg.set(p.first, p.second)) {
-    //         ERROR("can not set cgroup option '%s' to '%s'", p.first.c_str(), p.second.c_str());
-    //         clean_cg_exit(cg);
-    //     }
-    // }
+    for (auto it = config.cgroup_options.begin(); it != config.cgroup_options.end(); ++it) {
+        auto& p = (*it);
+        if (cg.set(p.first.first, p.first.second, p.second)) {
+            ERROR("can not set cgroup option '%s' to '%s'", p.first.second.c_str(), p.second.c_str());
+            clean_cg_exit(cg, 7);
+        }
+    }
 
     // Detect shared mounts
 
