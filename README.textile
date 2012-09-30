@@ -126,7 +126,7 @@ h2. Syscall filter
 This requires kernel >= 3.5 and libseccomp (at both compile and run time).
 
 <pre>
-% lrun --syscalls '!write' readlink /lib
+% lrun readlink /lib
 usr/lib
 </pre>
 
