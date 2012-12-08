@@ -21,16 +21,17 @@
 # THE SOFTWARE.
 ################################################################################
 
-# rofs.rb:
-#   Prepare /rofs
-#   - Prepare ESSENTIAL_DIRS
-#   - Mirror MIRROR_DIRS and mark read-only to /rofs
-#   - Prepare a `/etc/passwd` file
-#   - Mount a tmpfs at `/tmp`
-#   - Prepare `/dev/#{*DEV_NODES.keys}`
+# what rofs.rb do:
+#   make a /rofs which is the mirror of parts of /, but read-only
+#   - mkdir /rofs
+#   - mkdir ESSENTIAL_DIRS (mkdir -p)
+#   - mount --bind MIRRORED_DIRS to /rofs and make them read-only
+#   - generate a `/etc/passwd` file
+#   - mount a tmpfs at `/tmp`
+#   - prepare `/dev/#{*DEV_NODES.keys}`
 
 ESSENTIAL_DIRS = ['/usr', '/bin', '/opt', '/lib', '/lib64', '/etc', '/dev', '/tmp', '/proc']
-MIRROR_DIRS    = ['/usr', '/bin', '/opt', '/lib', '/lib64']
+MIRRORED_DIRS  = ['/usr', '/bin', '/opt', '/lib', '/lib64']
 DEV_NODES      = {null: 3, zero: 5, random: 8, urandom: 9, full: 7}
 
 ROFS_DEST      = ENV['ROFS_DEST'] || '/rofs'
@@ -101,7 +102,7 @@ end
 end
 
 # bind rofs
-MIRROR_DIRS.each do |src|
+MIRRORED_DIRS.each do |src|
   dest = File.join(ROFS_DEST, src)
   next unless Dir.exists?(src) && Dir.exists?(dest)
   mount src, dest, '--bind', 'defaults', 'ro,noatime,nosuid,nodev'
@@ -117,7 +118,7 @@ DEV_NODES.each do |dev, id|
   assert_execute 'mknod', '-m', '666', File.join(dev_path, dev.to_s), 'c', '1', id.to_s
 end
 
-# passwd
+# /etc/passwd
 if ESSENTIAL_DIRS.include?('/etc')
   File.open(File.join(ROFS_DEST, 'etc/passwd'), 'w') do |f|
     f.puts "guest:x:2000:200:bin:/bin:/bin/false"
