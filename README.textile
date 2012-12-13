@@ -149,4 +149,10 @@ Use `--status` to show realtime cpu, memory usage information:
 % lrun --status firefox
 </pre>
 
+h1. Troubleshooting
+
+*Error: "FATAL: can not mount cgroup memory on '/sys/fs/cgroup/memory' (No such file or directory)"*
+
+You may be using Debian. Memory controller is compiled but deactivated. Try adding @cgroup_enable=memory@ as a kernel parameter.
+When using grub2, this can be done by editing @GRUB_CMDLINE_LINUX@ in @/etc/default/grub@ and running @update-grub2@.
 
