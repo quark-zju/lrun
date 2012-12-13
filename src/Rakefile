@@ -16,12 +16,12 @@ task :default => [BIN]
 rule '.o' => '.cc' do |t|
   flags = ['-O2', '-std=c++0x', '-Wall', 
            "-DLIBSECCOMP_VERSION_MAJOR=#{`pkg-config --modversion --silence-errors libseccomp`[0]}",
-           `pkg-config --cflags libseccomp`.chomp].join(' ')
+           `pkg-config --silence-errors --cflags libseccomp`.chomp].join(' ')
   sh "#{CXX} #{flags} -c -o #{t.name} #{t.source}"
 end
 
 file BIN => OBJ do |t|
-  flags = `pkg-config --libs libseccomp`.chomp
+  flags = `pkg-config --silence-errors --libs libseccomp`.chomp
   sh "#{LD} #{flags} -o #{t.name} #{t.prerequisites * ' '}"
 end
 
