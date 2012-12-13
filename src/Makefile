@@ -1,6 +1,6 @@
 BINARIES=lrun
 OBJECTS=lrun.o strconv.o fs.o cgroup.o macros.o seccomp.o
-LIBSECCOMP_VERSION_MAJOR:=$(shell pkg-config --modversion libseccomp | sed 's/\..*//')
+LIBSECCOMP_VERSION_MAJOR:=$(shell pkg-config --modversion --silence-errors libseccomp | sed 's/\..*//')
 PKG_NAMES=libseccomp
 PKG_CFLAGS:=$(shell pkg-config --cflags $(PKG_NAMES))
 PKG_LDFLAGS:=$(shell pkg-config --libs $(PKG_NAMES))
