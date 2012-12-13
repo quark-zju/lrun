@@ -10,7 +10,7 @@ h1. Installation
 
 <pre>
 cd src
-make && sudo make install
+rake install
 </pre>
 
 Archlinux users can install lrun from AUR:
