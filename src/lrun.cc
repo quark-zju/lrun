@@ -225,7 +225,7 @@ static void parse_options(int argc, char * argv[]) {
             config.arg.rlimits[RLIMIT_NPROC] = NEXT_LONG_LONG_ARG;
         } else if (option == "min-nice") {
             REQUIRE_NARGV(1);
-            config.arg.rlimits[RLIMIT_NICE] = NEXT_LONG_LONG_ARG;
+            config.arg.rlimits[RLIMIT_NICE] = 20 - NEXT_LONG_LONG_ARG;
         } else if (option == "max-rtprio") {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_RTPRIO] = NEXT_LONG_LONG_ARG;

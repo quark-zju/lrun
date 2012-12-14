@@ -503,11 +503,12 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
         auto& p = (*it);
 
         int resource = p.first;
-        rlimit limit;
+        rlimit limit, current;
         limit.rlim_cur = limit.rlim_max = p.second;
 
         // wish to receive SIGXCPU to know it is TLE
         if (resource == RLIMIT_CPU) ++limit.rlim_max;
+        getrlimit(resource, &current);
 
         DEBUG_DO {
             char limit_name[16];
@@ -534,8 +535,11 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
                 default:
                     snprintf(limit_name, sizeof(limit_name), "0x%x", resource);
             }
-            INFO("setrlimit %s, cur: %d, max: %d", limit_name, (int)limit.rlim_cur, (int)limit.rlim_max);
+            INFO("setrlimit %s, cur: %d => %d, max: %d => %d", limit_name,
+                 (int)current.rlim_cur, (int)limit.rlim_cur,
+                 (int)current.rlim_max, (int)limit.rlim_max);
         }
+
         if (setrlimit(resource, &limit)) {
             WARNING("can not set rlimit %d", resource);
         }
@@ -581,11 +585,11 @@ static int clone_fn(void * clone_arg) {
     do_mount_tmpfs(arg);
     do_chdir(arg);
     do_commands(arg);
-    do_renice(arg);
     do_set_umask(arg);
     do_set_uid_gid(arg);
     do_apply_rlimits(arg);
     do_set_env(arg);
+    do_renice(arg);
 
     // all prepared! blocking, wait for parent
     INFO("waiting for parent");
