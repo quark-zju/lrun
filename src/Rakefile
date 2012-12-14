@@ -1,0 +1,37 @@
+require 'rake/clean'
+
+SRC     = FileList['*.cc']
+OBJ     = SRC.ext('o')
+BIN     = 'lrun'
+LD      = ENV['LD'] || 'g++'
+CXX     = ENV['CXX'] || 'g++'
+PREFIX  = ENV['PREFIX'] || '/usr/local'
+INSTALL = ENV['INSTALL'] || '/usr/bin/env install -c -D'
+
+CLEAN.include('*.o')
+CLOBBER.include(BIN)
+
+task :default => [BIN]
+
+rule '.o' => '.cc' do |t|
+  flags = ['-O2', '-std=c++0x', '-Wall', 
+           "-DLIBSECCOMP_VERSION_MAJOR=#{`pkg-config --modversion --silence-errors libseccomp`[0]}",
+           `pkg-config --silence-errors --cflags libseccomp`.chomp].join(' ')
+  sh "#{CXX} #{flags} -c -o #{t.name} #{t.source}"
+end
+
+file BIN => OBJ do |t|
+  flags = `pkg-config --silence-errors --libs libseccomp`.chomp
+  sh "#{LD} #{flags} -o #{t.name} #{t.prerequisites * ' '}"
+end
+
+task :install => BIN do |t|
+  cmd = "#{INSTALL} -m4555 -oroot -groot -s #{BIN} #{ENV['DESTDIR']}#{PREFIX}/bin/lrun"
+  # easier for non-root users
+  if Process.uid == 0
+    sh cmd
+  else
+    sh "sudo #{cmd}"
+  end
+end
+

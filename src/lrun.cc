@@ -20,7 +20,7 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "macros.h"
+#include "common.h"
 #include "cgroup.h"
 #include "fs.h"
 #include "strconv.h"
@@ -76,7 +76,7 @@ static void print_help() {
             "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n"
             "                                is not seperated, current processes are\n"
             "                                counted. Set uid to resolve this issue.\n"
-            "  --min-nice        n           Set min nice to n (-20 <= n < 19).\n"
+            /*"  --max-prio        n           Set max priority to n (0 <= n <= 40).\n"*/
             "  --max-rtprio      n           Set max realtime priority to n.\n"
             "  --max-nfile       n           Set max number of file descriptors to n.\n"
             "  --max-stack       bytes       Set max stack size per process.\n"
@@ -91,6 +91,9 @@ static void print_help() {
             "  --umask           int         Set umask.\n"
             "  --uid             uid         Set uid to specified uid (uid > 0).\n"
             "  --gid             gid         Set gid to specified gid (gid > 0).\n"
+    );
+    if (seccomp::supported()) {
+        fprintf(stderr,
             "  --syscalls        syscalls    Set syscall whitelist or blacklist.\n"
             "                                `syscalls` is a string starts with '!'\n"
             "                                or (optional) '='. Then a list of \n"
@@ -99,6 +102,9 @@ static void print_help() {
             "                                blacklist, otherwise whitelist.\n"
             "                                Note: you should make sure at least \n"
             "                                execve can be used.\n"
+        );
+    }
+    fprintf(stderr,
             "  --cgname          string      Specify cgroup name to use.\n"
             "                                Specified cgroup will be created on demand, \n"
             "                                and will not be deleted. If this option is \n"
@@ -117,7 +123,8 @@ static void print_help() {
             "                                hide filesystem subtree. size is in bytes.\n"
             "                                If bytes is 0, mount read-only.\n"
             "                                This is performed after chroot.\n"
-            // "  --cgroup-option   key value   Apply cgroup setting before exec.\n"
+            "  --cgroup-option   subsys key value\n"
+            "                                Apply cgroup setting before exec.\n"
             "  --env             key value   Set environment variable before exec.\n"
             "  --fd              n           Do not close fd n.\n"
             "  --group           gid         Set additional groups.\n"
@@ -133,9 +140,8 @@ static void print_help() {
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
             "       --reset-env false --interval 0.05 \\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
-            "       --min-nice 0 --max-rtprio 0 \\\n"
+            "       --max-rtprio 0 --nice 0\\\n"
             "       --uid $UID --gid $GID\n"
-            "       --syscalls !\n"
             "\n"
            );
     exit(0);
@@ -169,7 +175,6 @@ static void parse_options(int argc, char * argv[]) {
     config.arg.args = argv + 1;
 
     // arg.rlimits settings
-    config.arg.rlimits[RLIMIT_NICE] = 20 - 0;
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
     config.arg.rlimits[RLIMIT_NPROC] = 2048;
     config.arg.rlimits[RLIMIT_RTPRIO] = 0;
@@ -218,8 +223,9 @@ static void parse_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NPROC] = NEXT_LONG_LONG_ARG;
         } else if (option == "min-nice") {
+            // deprecated
             REQUIRE_NARGV(1);
-            config.arg.rlimits[RLIMIT_NICE] = NEXT_LONG_LONG_ARG;
+            config.arg.rlimits[RLIMIT_NICE] = 20 - NEXT_LONG_LONG_ARG;
         } else if (option == "max-rtprio") {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_RTPRIO] = NEXT_LONG_LONG_ARG;
@@ -261,7 +267,7 @@ static void parse_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             gid_t gid = (gid_t)NEXT_LONG_LONG_ARG;
             if (gid != 0) config.arg.gid = gid;
-        } else if (option == "syscalls") {
+        } else if (option == "syscalls" && seccomp::supported()) {
             REQUIRE_NARGV(1);
             string syscalls = NEXT_STRING_ARG;
 
@@ -296,11 +302,19 @@ static void parse_options(int argc, char * argv[]) {
             string path = NEXT_STRING_ARG;
             long long bytes = NEXT_LONG_LONG_ARG;
             config.arg.tmpfs_list.push_back(make_pair(path, bytes));
-        // } else if (option == "cgroup-option") {
-        //     REQUIRE_NARGV(2);
-        //     string key = NEXT_STRING_ARG;
-        //     string value = NEXT_STRING_ARG;
-        //     config.cgroup_options[key] = value;
+        } else if (option == "cgroup-option") {
+            REQUIRE_NARGV(3);
+            string subsys_name = NEXT_STRING_ARG;
+            string key = NEXT_STRING_ARG;
+            string value = NEXT_STRING_ARG;
+            int subsys_id = Cgroup::subsys_id_from_name(subsys_name.c_str());
+            if (subsys_id >= 0) {
+                config.cgroup_options[make_pair((Cgroup::subsys_id_t)subsys_id, key)] = value;
+            } else {
+                WARNING("cgroup option '%s' = '%s' ignored:"
+                        "subsystem '%s' not found",
+                        key.c_str(), value.c_str(), subsys_name.c_str());
+            }
         } else if (option == "env") {
             REQUIRE_NARGV(2);
             string key = NEXT_STRING_ARG;
@@ -433,13 +447,13 @@ int main(int argc, char * argv[]) {
     cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "0\n");
 
     // other cgroup options
-    // for (auto it = config.cgroup_options.begin(); it != config.cgroup_options.end(); ++it) {
-    //     auto& p = (*it);
-    //     if (cg.set(p.first, p.second)) {
-    //         ERROR("can not set cgroup option '%s' to '%s'", p.first.c_str(), p.second.c_str());
-    //         clean_cg_exit(cg);
-    //     }
-    // }
+    for (auto it = config.cgroup_options.begin(); it != config.cgroup_options.end(); ++it) {
+        auto& p = (*it);
+        if (cg.set(p.first.first, p.first.second, p.second)) {
+            ERROR("can not set cgroup option '%s' to '%s'", p.first.second.c_str(), p.second.c_str());
+            clean_cg_exit(cg, 7);
+        }
+    }
 
     // Detect shared mounts
 

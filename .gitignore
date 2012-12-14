@@ -10,7 +10,7 @@
 # no binaries
 test/[a-z_]*
 src/[a-z_]*
-utils/[a-z_]*
+*.so
 
 # include sources
 !*.cc

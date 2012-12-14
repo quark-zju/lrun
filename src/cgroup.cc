@@ -20,7 +20,6 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "macros.h"
 #include "cgroup.h"
 #include "fs.h"
 #include "strconv.h"
@@ -50,6 +49,13 @@ const char Cgroup::subsys_names[4][8] = {
 };
 
 std::string Cgroup::subsys_base_paths_[sizeof(subsys_names) / sizeof(subsys_names[0])];
+
+int Cgroup::subsys_id_from_name(const char * const name) {
+    for (size_t i = 0; i < sizeof(subsys_names) / sizeof(subsys_names[0]); ++i) {
+        if (strcmp(name, subsys_names[i])) return i;
+    }
+    return -1;
+}
 
 string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
     {
@@ -358,17 +364,16 @@ int Cgroup::set_memory_limit(long long bytes) {
     return e ? -1 : 0;
 }
 
-static int clone_fn(void * clone_arg) {
+// following functions are called by clone_fn
 
-    // this is executed in child process after clone
-    // fs and uid settings should be done here
-    Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
-
+static void do_privatize_filesystem(const Cgroup::spawn_arg& arg) {
     // make sure filesystem not be shared
     if (fs::mount_set_shared("/", MS_PRIVATE | MS_REC)) {
         FATAL("can not mount --make-rprivate /");
     }
+}
 
+static void do_mount_bindfs(const Cgroup::spawn_arg& arg) {
     // bind fs mounts
     for (auto it = arg.bindfs_list.begin(); it != arg.bindfs_list.end(); ++it) {
         auto& p = (*it);
@@ -381,17 +386,21 @@ static int clone_fn(void * clone_arg) {
             FATAL("mount bind '%s' -> '%s' failed", src.c_str(), dest.c_str());
         }
     }
+}
 
+static void do_chroot(const Cgroup::spawn_arg& arg) {
     // chroot to a prepared place
     if (!arg.chroot_path.empty()) {
-        string& path = arg.chroot_path;
+        const string& path = arg.chroot_path;
 
         INFO("chroot %s", path.c_str());
         if (chroot(path.c_str())) {
             FATAL("chroot '%s' failed", path.c_str());
         }
     }
+}
 
+static void do_mount_proc(const Cgroup::spawn_arg& arg) {
     // mount /proc if pid namespace is enabled
     if (arg.clone_flags & CLONE_NEWPID) {
         INFO("mount /proc");
@@ -399,7 +408,9 @@ static int clone_fn(void * clone_arg) {
             FATAL("mount procfs failed");
         }
     }
+}
 
+static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
     // close fds other than 0,1,2 and sockets[0], since we have proper /proc now
     close(arg.sockets[1]);
     struct dirent **namelist = 0;
@@ -418,7 +429,9 @@ static int clone_fn(void * clone_arg) {
         free(namelist[i]);
     }
     if (namelist) free(namelist);
+}
 
+static void do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
     // setup other tmpfs mounts
     for (auto it = arg.tmpfs_list.begin(); it != arg.tmpfs_list.end(); ++it) {
         auto& p = (*it);
@@ -439,49 +452,64 @@ static int clone_fn(void * clone_arg) {
             FATAL("mount tmpfs '%s' failed", dest);
         }
     }
+}
 
+static void do_chdir(const Cgroup::spawn_arg& arg) {
     // chdir to a specified path
     if (!arg.chdir_path.empty()) {
-        string& path = arg.chdir_path;
+        const string& path = arg.chdir_path;
 
         INFO("chdir %s", path.c_str());
         if (chdir(path.c_str())) {
             FATAL("chdir '%s' failed", path.c_str());
         }
     }
+}
 
+static void do_commands(const Cgroup::spawn_arg& arg) {
     // system commands
     for (auto it = arg.cmd_list.begin(); it != arg.cmd_list.end(); ++it) {
         INFO("system %s", it->c_str());
         system(it->c_str());
     }
+}
 
+static void do_renice(const Cgroup::spawn_arg& arg) {
     // nice
     if (arg.nice) {
         INFO("nice %d", (int)arg.nice);
-        nice(arg.nice);
+        if (nice(arg.nice) == -1) {
+            WARNING("can not set nice to %d", arg.nice);
+        }
     }
+}
 
+static void do_set_umask(const Cgroup::spawn_arg& arg) {
     // set umask
     INFO("umask %d", arg.umask);
     umask(arg.umask);
+}
 
+static void do_set_uid_gid(const Cgroup::spawn_arg& arg) {
     // setup uid, gid
     INFO("setgid %d, setuid %d", (int)arg.gid, (int)arg.uid);
     if (setgid(arg.gid) || setuid(arg.uid)) {
         FATAL("setgid(%d) or setuid(%d) failed", (int)arg.gid, (int)arg.uid);
     }
+}
 
+static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
     // apply rlimit, note NPROC limit should be applied after setuid
     for (auto it = arg.rlimits.begin(); it != arg.rlimits.end(); ++it) {
         auto& p = (*it);
 
         int resource = p.first;
-        rlimit limit;
+        rlimit limit, current;
         limit.rlim_cur = limit.rlim_max = p.second;
 
         // wish to receive SIGXCPU to know it is TLE
         if (resource == RLIMIT_CPU) ++limit.rlim_max;
+        getrlimit(resource, &current);
 
         DEBUG_DO {
             char limit_name[16];
@@ -508,13 +536,18 @@ static int clone_fn(void * clone_arg) {
                 default:
                     snprintf(limit_name, sizeof(limit_name), "0x%x", resource);
             }
-            INFO("setrlimit %s, cur: %d, max: %d", limit_name, (int)limit.rlim_cur, (int)limit.rlim_max);
+            INFO("setrlimit %s, cur: %d => %d, max: %d => %d", limit_name,
+                 (int)current.rlim_cur, (int)limit.rlim_cur,
+                 (int)current.rlim_max, (int)limit.rlim_max);
         }
+
         if (setrlimit(resource, &limit)) {
-            FATAL("can not set rlimit %d", resource);
+            WARNING("can not set rlimit %d", resource);
         }
     }
+}
 
+static void do_set_env(const Cgroup::spawn_arg& arg) {
     // prepare env
     if (arg.reset_env) {
         INFO("reset ENV");
@@ -529,6 +562,35 @@ static int clone_fn(void * clone_arg) {
 
         if (setenv(name, value, 1)) FATAL("can not set env %s=%s", name, value);
     }
+}
+
+static void do_seccomp(const Cgroup::spawn_arg& arg) {
+    // syscall whitelist
+    if (seccomp::supported() && seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
+        FATAL("seccomp failed");
+        exit(-1);
+    }
+}
+
+static int clone_fn(void * clone_arg) {
+
+    // this is executed in child process after clone
+    // fs and uid settings should be done here
+    Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
+
+    do_privatize_filesystem(arg);
+    do_mount_bindfs(arg);
+    do_chroot(arg);
+    do_mount_proc(arg);
+    do_close_high_fds(arg);
+    do_mount_tmpfs(arg);
+    do_chdir(arg);
+    do_commands(arg);
+    do_set_umask(arg);
+    do_set_uid_gid(arg);
+    do_apply_rlimits(arg);
+    do_set_env(arg);
+    do_renice(arg);
 
     // all prepared! blocking, wait for parent
     INFO("waiting for parent");
@@ -547,22 +609,14 @@ static int clone_fn(void * clone_arg) {
         return -1;
     }
 
-    // syscall whitelist
-    if (seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
-        FATAL("seccomp failed");
-        return -1;
-    }
+    do_seccomp(arg);
 
     // exec target
     INFO("execvp %s ...", arg.args[0]);
 
     execvp(arg.args[0], arg.args);
 
-    // exec failed, store errno
-    int last_err = errno;
-
-    // output to stderr
-    errno = last_err;
+    // exec failed, output to stderr
     ERROR("exec '%s' failed", arg.args[0]);
 
     // notify parent that exec failed
@@ -572,7 +626,6 @@ static int clone_fn(void * clone_arg) {
     // wait parent
     read(arg.sockets[0], buf, sizeof buf);
 
-    exit(-1);
     return -1;
 } // clone_fn
 

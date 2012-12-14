@@ -22,6 +22,7 @@
 ################################################################################
 
 @no_problem = true
+@kernel_version = `uname -r`
 @config = if File.exists? '/proc/config.gz'
             `zcat /proc/config.gz`
           else
@@ -34,21 +35,27 @@ if @config.empty?
   raise RuntimeError.new('Can not load config')
 end
 
-def check name, config
-  exists = (@config =~ /^#{config}=[ym]/)
-  @no_problem = false if not exists
-  puts '%-12s: %s' % [name, exists ? 'OK' : 'MISSING']
+def check_kernel version_range
+  version_range.cover? @kernel_version
 end
 
+def check_config name, config
+  exists = (@config =~ /^#{config}=[ym]/)
+  @no_problem = false if not exists
+  puts '%-12s: %s' % [name, exists ? 'OK' : 'MISSING?']
+end
 
-check 'Namespaces',    'CONFIG_NAMESPACES'
-check '    pid',       'CONFIG_PID_NS'
-check '    ipc',       'CONFIG_IPC_NS'
-check '    network',   'CONFIG_NET_NS'
-check 'Cgroup',        'CONFIG_CGROUPS'
-check '    device',    'CONFIG_CGROUP_DEVICE'
-check '    cpuacct',   'CONFIG_CGROUP_CPUACCT'
-check '    memory',    'CONFIG_CGROUP_MEM_RES_CTLR'
-check '    freezer',   'CONFIG_CGROUP_FREEZER'
+check_config 'Namespaces',    'CONFIG_NAMESPACES'
+check_config '    pid',       'CONFIG_PID_NS'
+check_config '    ipc',       'CONFIG_IPC_NS'
+check_config '    network',   'CONFIG_NET_NS'
+check_config 'Cgroup',        'CONFIG_CGROUPS'
+check_config '    device',    'CONFIG_CGROUP_DEVICE'
+check_config '    cpuacct',   'CONFIG_CGROUP_CPUACCT'
+# Since 2.6.39-bpo60-2 for Squeeze the memory cgroup support is built in
+if check_kernel [0]..[2, 6, 39]
+  check_config '    memory',    'CONFIG_CGROUP_MEM_RES_CTLR'
+end
+check_config '    freezer',   'CONFIG_CGROUP_FREEZER'
 
 exit(@no_problem ? 0 : 1)

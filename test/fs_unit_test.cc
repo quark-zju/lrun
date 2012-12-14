@@ -146,7 +146,9 @@ TESTCASE(mount_tmpfs) {
     if (e < 0 && errno == EPERM) {
         puts("  No permission to mount. Skipped.");
     } else {
-        CHECK(e == 0);
+        CHECK(e == 0) {
+            perror("can not mount " TMP "/_mt");
+        }
         CHECK(system("touch " TMP "/_mt/ee") == 0);
         // write test
         CHECK(system("echo hello > " TMP "/_mt/ee") == 0);

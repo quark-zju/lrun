@@ -51,6 +51,13 @@ namespace lrun {
             static const char subsys_names[4][8];
             static const int SUBSYS_COUNT = sizeof(subsys_names) / sizeof(subsys_names[0]);
 
+            /**
+             * get cgroup subsystem id from name
+             * @param   name            cgroup subsystem name
+             * @return  >=0             cgroup subsystem id
+             *          -1              subsystem id not found
+             */
+            static int subsys_id_from_name(const char * const name);
 
             /**
              * get cgroup mounted path
@@ -58,6 +65,7 @@ namespace lrun {
              * @return  cgroup mounted path (first one in mount table)
              */
             static std::string base_path(subsys_id_t subsys_id, bool create_on_need = true);
+
 
             /**
              * create a cgroup, use existing if possible

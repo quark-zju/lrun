@@ -37,7 +37,7 @@ module Lrun
     :max_memory => 1,
     :max_output => 1,
     :max_nprocess => 1,
-    :min_nice => 1,
+    # :min_nice => 1,
     :max_rtprio => 1,
     :max_nfile => 1,
     :max_stack => 1,
@@ -65,9 +65,7 @@ module Lrun
 
   @@logger = nil
 
-  class LrunError < RuntimeError
-
-  end
+  class LrunError < RuntimeError; end
 
   # memory:   bytes
   # time:     seconds

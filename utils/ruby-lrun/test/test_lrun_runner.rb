@@ -98,8 +98,8 @@ class TestLrunRunner < MiniTest::Unit::TestCase
   end
 
   def test_restricted
-    assert_equal 0, l.run(['ifconfig', 'eth0']).exitcode
-    refute_equal 0, l.network(true).restricted.network(true).run(['ifconfig', 'eth0']).exitcode
+    assert_equal 0, l.run(['/sbin/ifconfig', 'eth0']).exitcode
+    refute_equal 0, l.network(true).restricted.network(true).run(['/sbin/ifconfig', 'eth0']).exitcode
   end
 
   def test_rofs_binded
@@ -166,9 +166,11 @@ class TestLrunRunner < MiniTest::Unit::TestCase
   end
 
   def test_script
+    skip if `/usr/bin/lua -v 2>&1`.empty?
+
     prepare_tmpdir
 
-    assert_equal 'hello', b.run("#!/usr/bin/env ruby\nputs :hello").stdout.chomp
+    assert_equal 'hello', b.run("#!/usr/bin/env lua\nprint 'hello'").stdout.chomp
   end
 
   def test_badprog_forkforever
