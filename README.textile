@@ -149,6 +149,10 @@ Use `--status` to show realtime cpu, memory usage information:
 % lrun --status firefox
 </pre>
 
+h1. Utilities
+
+There are some related utilities in @utils@ directory. You may find some of them helpful.
+
 h1. Troubleshooting
 
 *Error: "FATAL: can not mount cgroup memory on '/sys/fs/cgroup/memory' (No such file or directory)"*
