@@ -479,7 +479,9 @@ static void do_renice(const Cgroup::spawn_arg& arg) {
     // nice
     if (arg.nice) {
         INFO("nice %d", (int)arg.nice);
-        nice(arg.nice);
+        if (nice(arg.nice) == -1) {
+            WARNING("can not set nice to %d", arg.nice);
+        }
     }
 }
 

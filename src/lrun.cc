@@ -76,7 +76,7 @@ static void print_help() {
             "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n"
             "                                is not seperated, current processes are\n"
             "                                counted. Set uid to resolve this issue.\n"
-            "  --min-nice        n           Set min nice to n (-20 <= n < 19).\n"
+            /*"  --max-prio        n           Set max priority to n (0 <= n <= 40).\n"*/
             "  --max-rtprio      n           Set max realtime priority to n.\n"
             "  --max-nfile       n           Set max number of file descriptors to n.\n"
             "  --max-stack       bytes       Set max stack size per process.\n"
@@ -140,7 +140,7 @@ static void print_help() {
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
             "       --reset-env false --interval 0.05 \\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
-            "       --min-nice 0 --max-rtprio 0 \\\n"
+            "       --max-rtprio 0 --nice 0\\\n"
             "       --uid $UID --gid $GID\n"
             "\n"
            );
@@ -175,7 +175,6 @@ static void parse_options(int argc, char * argv[]) {
     config.arg.args = argv + 1;
 
     // arg.rlimits settings
-    config.arg.rlimits[RLIMIT_NICE] = 20 - 0;
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
     config.arg.rlimits[RLIMIT_NPROC] = 2048;
     config.arg.rlimits[RLIMIT_RTPRIO] = 0;
@@ -224,6 +223,7 @@ static void parse_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NPROC] = NEXT_LONG_LONG_ARG;
         } else if (option == "min-nice") {
+            // deprecated
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NICE] = 20 - NEXT_LONG_LONG_ARG;
         } else if (option == "max-rtprio") {
