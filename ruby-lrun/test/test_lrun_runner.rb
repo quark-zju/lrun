@@ -98,7 +98,7 @@ class TestLrunRunner < MiniTest::Unit::TestCase
   end
 
   def test_restricted
-    assert_equal 0, l.run(['ifconfig', 'eth0']).exitcode
+    assert_equal 0, l.run(['/sbin/ifconfig', 'eth0']).exitcode
     refute_equal 0, l.network(true).restricted.network(true).run(['ifconfig', 'eth0']).exitcode
   end
 
