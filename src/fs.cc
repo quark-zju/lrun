@@ -140,7 +140,7 @@ int fs::mount_tmpfs(const string& dest, size_t max_size, mode_t mode) {
     int e = mount(NULL,
                  dest.c_str(),
                  TYPE_TMPFS,
-                 MS_NOSUID | MS_NODEV | MS_SLAVE,
+                 MS_NOSUID | MS_NODEV,
                  tmpfs_opts);
     return e;
 }
