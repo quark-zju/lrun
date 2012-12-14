@@ -31,7 +31,7 @@
 #   - prepare `/dev/#{*DEV_NODES.keys}`
 
 ESSENTIAL_DIRS = ['/usr', '/bin', '/opt', '/lib', '/lib64', '/etc', '/dev', '/tmp', '/proc']
-MIRRORED_DIRS  = ['/usr', '/bin', '/opt', '/lib', '/lib64']
+MIRRORED_DIRS  = ['/usr', '/bin', '/opt', '/lib', '/lib64', '/etc/alternatives']
 DEV_NODES      = {null: 3, zero: 5, random: 8, urandom: 9, full: 7}
 
 ROFS_DEST      = ENV['ROFS_DEST'] || '/rofs'
@@ -87,7 +87,7 @@ end
 
 FileUtils.mkdir_p ROFS_DEST
 
-ESSENTIAL_DIRS.each do |x|
+[*ESSENTIAL_DIRS, *MIRRORED_DIRS].uniq.each do |x|
   dir = File.join(ROFS_DEST, x)
   next unless Dir.exists?(x) && (! Dir.exists?(dir))
   FileUtils.mkdir_p dir
