@@ -166,7 +166,7 @@ class TestLrunRunner < MiniTest::Unit::TestCase
   end
 
   def test_script
-    skip if `lua -v 2>&1`.empty?
+    skip if `/usr/bin/lua -v 2>&1`.empty?
 
     prepare_tmpdir
 
