@@ -20,7 +20,7 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "macros.h"
+#include "common.h"
 #include "cgroup.h"
 #include "fs.h"
 #include "strconv.h"

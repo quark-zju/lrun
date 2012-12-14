@@ -77,11 +77,13 @@ namespace test {
     void test_ ## name()
         
 
+#define CONCAT_HELPER(a,b) a ## b
+#define CONCAT(a,b) CONCAT_HELPER(a,b)
 #define CHECK(cond) \
-{ \
     test::total_case++; \
     test::term::set(); \
-    if (cond) { \
+    int CONCAT(_chk_, __LINE__) = (int)(cond); \
+    if (CONCAT(_chk_, __LINE__)) { \
         test::term::set(test::term::attr::RESET, test::term::fg::GREEN); \
         printf("  PASS\n"); \
         test::term::set(); \
@@ -91,6 +93,4 @@ namespace test {
         test::failed_case++; \
         test::term::set(); \
     } \
-}
-
- 
+    if (!CONCAT(_chk_, __LINE__))

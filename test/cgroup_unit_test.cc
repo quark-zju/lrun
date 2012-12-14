@@ -26,7 +26,7 @@
 using namespace lrun;
 
 TESTCASE(get_path) {
-    CHECK(!Cgroup::base_path().empty());
+    CHECK(!Cgroup::base_path(Cgroup::CG_CPUACCT).empty());
 }
 
 TESTCASE(create_and_destroy) {
@@ -39,8 +39,8 @@ TESTCASE(create_and_destroy) {
 TESTCASE(set_properties) {
     Cgroup cg = Cgroup::create("testsetprop");
     // FIXME assume no swap here
-    CHECK(cg.set("memory.limit_in_bytes", "1048576") == 0);
-    CHECK(cg.get("memory.limit_in_bytes") == "1048576\n");
+    CHECK(cg.set(Cgroup::CG_MEMORY, "memory.limit_in_bytes", "1048576") == 0);
+    CHECK(cg.get(Cgroup::CG_MEMORY, "memory.limit_in_bytes") == "1048576\n");
     CHECK(cg.reset_usages() == 0);
     CHECK(cg.destroy() == 0);
 }

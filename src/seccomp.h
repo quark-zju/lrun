@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "macros.h"
+#include "common.h"
 
 namespace lrun {
     namespace seccomp {
