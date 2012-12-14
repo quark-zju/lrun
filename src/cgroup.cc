@@ -561,7 +561,7 @@ static void do_set_env(const Cgroup::spawn_arg& arg) {
 
 static void do_seccomp(const Cgroup::spawn_arg& arg) {
     // syscall whitelist
-    if (seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
+    if (seccomp::supported() && seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
         FATAL("seccomp failed");
         exit(-1);
     }

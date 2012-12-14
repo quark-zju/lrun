@@ -49,6 +49,13 @@ namespace lrun {
          *              other      other error.
          */
         int apply_simple_filter(const char * const filter, action_t default_action = DEFAULT_KILL);
+
+        /**
+         * Check seccomp is supported or not
+         * @return int      1       seccomp is supported
+         *                  0       seccomp is not supported
+         */
+        int supported();
     }
 }
 

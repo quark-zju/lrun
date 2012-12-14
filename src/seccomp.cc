@@ -1290,12 +1290,20 @@ err:
 #undef CHAR_FOR_SCMP_ACTION
 }
 
+int sc::supported() {
+    return 1;
+}
+
 #else
 
 # warning libseccomp version 1.x not found
 
 int sc::apply_simple_filter(const char * const filter, sc::action_t action) {
     return 1;
+}
+
+int sc::supported() {
+    return 0;
 }
 
 #endif

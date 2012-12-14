@@ -91,6 +91,9 @@ static void print_help() {
             "  --umask           int         Set umask.\n"
             "  --uid             uid         Set uid to specified uid (uid > 0).\n"
             "  --gid             gid         Set gid to specified gid (gid > 0).\n"
+    );
+    if (seccomp::supported()) {
+        fprintf(stderr,
             "  --syscalls        syscalls    Set syscall whitelist or blacklist.\n"
             "                                `syscalls` is a string starts with '!'\n"
             "                                or (optional) '='. Then a list of \n"
@@ -99,6 +102,9 @@ static void print_help() {
             "                                blacklist, otherwise whitelist.\n"
             "                                Note: you should make sure at least \n"
             "                                execve can be used.\n"
+        );
+    }
+    fprintf(stderr,
             "  --cgname          string      Specify cgroup name to use.\n"
             "                                Specified cgroup will be created on demand, \n"
             "                                and will not be deleted. If this option is \n"
@@ -136,7 +142,6 @@ static void print_help() {
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
             "       --min-nice 0 --max-rtprio 0 \\\n"
             "       --uid $UID --gid $GID\n"
-            "       --syscalls !\n"
             "\n"
            );
     exit(0);
@@ -262,7 +267,7 @@ static void parse_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             gid_t gid = (gid_t)NEXT_LONG_LONG_ARG;
             if (gid != 0) config.arg.gid = gid;
-        } else if (option == "syscalls") {
+        } else if (option == "syscalls" && seccomp::supported()) {
             REQUIRE_NARGV(1);
             string syscalls = NEXT_STRING_ARG;
 
