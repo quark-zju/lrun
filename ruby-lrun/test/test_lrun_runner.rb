@@ -166,9 +166,11 @@ class TestLrunRunner < MiniTest::Unit::TestCase
   end
 
   def test_script
+    skip if `lua -v 2>&1`.empty?
+
     prepare_tmpdir
 
-    assert_equal 'hello', b.run("#!/usr/bin/env ruby\nputs :hello").stdout.chomp
+    assert_equal 'hello', b.run("#!/usr/bin/env lua\nprint 'hello'").stdout.chomp
   end
 
   def test_badprog_forkforever
