@@ -26,7 +26,7 @@
 using namespace lrun;
 
 TESTCASE(get_path) {
-    CHECK(!Cgroup::base_path(Cgroup::CG_CPUACCT).empty());
+    CHECK(!Cgroup::base_path(Cgroup::CG_CPUACCT, true).empty());
 }
 
 TESTCASE(create_and_destroy) {

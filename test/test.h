@@ -68,7 +68,7 @@ namespace test {
 
 #define TESTCASE(name) \
     void test_ ## name(); \
-    __attribute__((constructor)) void auto_test_ ## name() { \
+    __attribute__((constructor(65535))) void auto_test_ ## name() { \
         test::term::set(test::term::attr::BOLD, test::term::fg::WHITE); \
         printf("TEST CASE: %s\n", #name); \
         test::term::set(); \
