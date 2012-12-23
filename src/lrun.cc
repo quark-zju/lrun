@@ -634,7 +634,9 @@ int main(int argc, char * argv[]) {
             WTERMSIG(stat),
             exceeded_limit.empty() ? "none" : exceeded_limit.c_str());
 
-    (void)write(3, status_report, strlen(status_report));
+    int ret;
+    ret = write(3, status_report, strlen(status_report));
+    (void)ret;
 
     clean_cg_exit(cg, 0);
     return 0;
