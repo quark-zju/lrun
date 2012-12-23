@@ -185,7 +185,7 @@ void Cgroup::update_output_count() {
         long long bytes = 0;
         sscanf(spid, "%ld", &pid);
         FILE * io = fopen((string(fs::PROC_PATH) + "/" + spid + "/io").c_str(), "r");
-        fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
+        (void)fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
         if (output_counter_[pid] < bytes) output_counter_[pid] = bytes;
         fclose(io);
     }
@@ -470,7 +470,8 @@ static void do_commands(const Cgroup::spawn_arg& arg) {
     // system commands
     for (auto it = arg.cmd_list.begin(); it != arg.cmd_list.end(); ++it) {
         INFO("system %s", it->c_str());
-        system(it->c_str());
+        int ret = system(it->c_str());
+        if (ret) WARNING("system \"%s\" returns %d", it->c_str(), ret);
     }
 }
 
@@ -595,12 +596,12 @@ static int clone_fn(void * clone_arg) {
     // all prepared! blocking, wait for parent
     INFO("waiting for parent");
     char buf[4];
-    read(arg.sockets[0], buf, sizeof buf);
+    (void)read(arg.sockets[0], buf, sizeof buf);
 
     // let parent know we got the message, parent then can close fd without SIGPIPE child
     INFO("got from parent: '%3s'. notify parent", buf);
     strcpy(buf, "PRE");
-    write(arg.sockets[0], buf, sizeof buf);
+    (void)write(arg.sockets[0], buf, sizeof buf);
 
     // not closing sockets[0] here, it will closed on exec
     // if exec fails, it will be closed upon process exit (aka. this function returns)
@@ -621,10 +622,10 @@ static int clone_fn(void * clone_arg) {
 
     // notify parent that exec failed
     strcpy(buf, "ERR");
-    write(arg.sockets[0], buf, sizeof buf);
+    (void)write(arg.sockets[0], buf, sizeof buf);
 
     // wait parent
-    read(arg.sockets[0], buf, sizeof buf);
+    (void)read(arg.sockets[0], buf, sizeof buf);
 
     return -1;
 } // clone_fn
@@ -742,7 +743,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
     // wait for child response
     INFO("reading from child");
-    read(arg.sockets[1], buf, sizeof buf);
+    (void)read(arg.sockets[1], buf, sizeof buf);
     INFO("from child, got '%3s'", buf);
     if (buf[0] != 'P') {
         // child has problem to start
