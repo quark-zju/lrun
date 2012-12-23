@@ -447,8 +447,7 @@ int main(int argc, char * argv[]) {
     cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "0\n");
 
     // other cgroup options
-    for (auto it = config.cgroup_options.begin(); it != config.cgroup_options.end(); ++it) {
-        auto& p = (*it);
+    FOR_EACH(p, config.cgroup_options) {
         if (cg.set(p.first.first, p.first.second, p.second)) {
             ERROR("can not set cgroup option '%s' to '%s'", p.first.second.c_str(), p.second.c_str());
             clean_cg_exit(cg, 7);

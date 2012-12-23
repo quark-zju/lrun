@@ -196,7 +196,7 @@ void Cgroup::update_output_count() {
 
 long long Cgroup::output_usage() const {
     long long bytes = 0;
-    for (const auto& p : output_counter_) {
+    FOR_EACH_CONST(p, output_counter_) {
         bytes += p.second;
     }
     return bytes;
@@ -377,9 +377,7 @@ static void do_privatize_filesystem(const Cgroup::spawn_arg& arg) {
 
 static void do_mount_bindfs(const Cgroup::spawn_arg& arg) {
     // bind fs mounts
-    for (auto it = arg.bindfs_list.begin(); it != arg.bindfs_list.end(); ++it) {
-        auto& p = (*it);
-
+    FOR_EACH(p, arg.bindfs_list) {
         const string& dest = p.first;
         const string& src = p.second;
 
@@ -435,9 +433,7 @@ static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
 
 static void do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
     // setup other tmpfs mounts
-    for (auto it = arg.tmpfs_list.begin(); it != arg.tmpfs_list.end(); ++it) {
-        auto& p = (*it);
-
+    FOR_EACH(p, arg.tmpfs_list) {
         const char * dest = p.first.c_str();
         const long long& size = p.second;
 
@@ -470,10 +466,10 @@ static void do_chdir(const Cgroup::spawn_arg& arg) {
 
 static void do_commands(const Cgroup::spawn_arg& arg) {
     // system commands
-    for (auto it = arg.cmd_list.begin(); it != arg.cmd_list.end(); ++it) {
-        INFO("system %s", it->c_str());
-        int ret = system(it->c_str());
-        if (ret) WARNING("system \"%s\" returns %d", it->c_str(), ret);
+    FOR_EACH(cmd, arg.cmd_list) {
+        INFO("system %s", cmd.c_str());
+        int ret = system(cmd.c_str());
+        if (ret) WARNING("system \"%s\" returns %d", cmd.c_str(), ret);
     }
 }
 
@@ -503,9 +499,7 @@ static void do_set_uid_gid(const Cgroup::spawn_arg& arg) {
 
 static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
     // apply rlimit, note NPROC limit should be applied after setuid
-    for (auto it = arg.rlimits.begin(); it != arg.rlimits.end(); ++it) {
-        auto& p = (*it);
-
+    FOR_EACH(p, arg.rlimits) {
         int resource = p.first;
         if (resource >= RLIMIT_NLIMITS) continue;
 
@@ -558,9 +552,7 @@ static void do_set_env(const Cgroup::spawn_arg& arg) {
         if (clearenv()) FATAL("can not clear env");
     }
 
-    for (auto it = arg.env_list.begin(); it != arg.env_list.end(); ++it) {
-        auto& p = (*it);
-
+    FOR_EACH(p, arg.env_list) {
         const char * name = p.first.c_str();
         const char * value = p.second.c_str();
 
