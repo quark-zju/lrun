@@ -39,6 +39,10 @@
 # define MS_PRIVATE 0
 #endif
 
+#ifndef MS_SLAVE
+# define MS_SLAVE 0
+#endif
+
 namespace lrun {
     namespace fs {
         /**
