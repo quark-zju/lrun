@@ -185,7 +185,9 @@ void Cgroup::update_output_count() {
         long long bytes = 0;
         sscanf(spid, "%ld", &pid);
         FILE * io = fopen((string(fs::PROC_PATH) + "/" + spid + "/io").c_str(), "r");
-        fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
+        int res = 0;
+        res = fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
+        (void)res;
         if (output_counter_[pid] < bytes) output_counter_[pid] = bytes;
         fclose(io);
     }
@@ -194,7 +196,7 @@ void Cgroup::update_output_count() {
 
 long long Cgroup::output_usage() const {
     long long bytes = 0;
-    for (const auto& p : output_counter_) {
+    FOR_EACH_CONST(p, output_counter_) {
         bytes += p.second;
     }
     return bytes;
@@ -368,16 +370,16 @@ int Cgroup::set_memory_limit(long long bytes) {
 
 static void do_privatize_filesystem(const Cgroup::spawn_arg& arg) {
     // make sure filesystem not be shared
-    if (fs::mount_set_shared("/", MS_PRIVATE | MS_REC)) {
+    // ignore this step for old systems without these features
+    int type = MS_PRIVATE | MS_REC;
+    if (type && fs::mount_set_shared("/", MS_PRIVATE | MS_REC)) {
         FATAL("can not mount --make-rprivate /");
     }
 }
 
 static void do_mount_bindfs(const Cgroup::spawn_arg& arg) {
     // bind fs mounts
-    for (auto it = arg.bindfs_list.begin(); it != arg.bindfs_list.end(); ++it) {
-        auto& p = (*it);
-
+    FOR_EACH(p, arg.bindfs_list) {
         const string& dest = p.first;
         const string& src = p.second;
 
@@ -433,9 +435,7 @@ static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
 
 static void do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
     // setup other tmpfs mounts
-    for (auto it = arg.tmpfs_list.begin(); it != arg.tmpfs_list.end(); ++it) {
-        auto& p = (*it);
-
+    FOR_EACH(p, arg.tmpfs_list) {
         const char * dest = p.first.c_str();
         const long long& size = p.second;
 
@@ -468,9 +468,10 @@ static void do_chdir(const Cgroup::spawn_arg& arg) {
 
 static void do_commands(const Cgroup::spawn_arg& arg) {
     // system commands
-    for (auto it = arg.cmd_list.begin(); it != arg.cmd_list.end(); ++it) {
-        INFO("system %s", it->c_str());
-        system(it->c_str());
+    FOR_EACH(cmd, arg.cmd_list) {
+        INFO("system %s", cmd.c_str());
+        int ret = system(cmd.c_str());
+        if (ret) WARNING("system \"%s\" returns %d", cmd.c_str(), ret);
     }
 }
 
@@ -500,10 +501,10 @@ static void do_set_uid_gid(const Cgroup::spawn_arg& arg) {
 
 static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
     // apply rlimit, note NPROC limit should be applied after setuid
-    for (auto it = arg.rlimits.begin(); it != arg.rlimits.end(); ++it) {
-        auto& p = (*it);
-
+    FOR_EACH(p, arg.rlimits) {
         int resource = p.first;
+        if (resource >= RLIMIT_NLIMITS) continue;
+
         rlimit limit, current;
         limit.rlim_cur = limit.rlim_max = p.second;
 
@@ -531,7 +532,6 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
                 CONVERT_NAME(RLIMIT_NICE);
                 CONVERT_NAME(RLIMIT_RTPRIO);
                 CONVERT_NAME(RLIMIT_RTTIME);
-                CONVERT_NAME(RLIMIT_NLIMITS);
 #undef CONVERT_NAME
                 default:
                     snprintf(limit_name, sizeof(limit_name), "0x%x", resource);
@@ -554,9 +554,7 @@ static void do_set_env(const Cgroup::spawn_arg& arg) {
         if (clearenv()) FATAL("can not clear env");
     }
 
-    for (auto it = arg.env_list.begin(); it != arg.env_list.end(); ++it) {
-        auto& p = (*it);
-
+    FOR_EACH(p, arg.env_list) {
         const char * name = p.first.c_str();
         const char * value = p.second.c_str();
 
@@ -595,12 +593,14 @@ static int clone_fn(void * clone_arg) {
     // all prepared! blocking, wait for parent
     INFO("waiting for parent");
     char buf[4];
-    read(arg.sockets[0], buf, sizeof buf);
+    int ret = read(arg.sockets[0], buf, sizeof buf);
+    (void)ret;
 
     // let parent know we got the message, parent then can close fd without SIGPIPE child
     INFO("got from parent: '%3s'. notify parent", buf);
     strcpy(buf, "PRE");
-    write(arg.sockets[0], buf, sizeof buf);
+    ret = write(arg.sockets[0], buf, sizeof buf);
+    (void)ret;
 
     // not closing sockets[0] here, it will closed on exec
     // if exec fails, it will be closed upon process exit (aka. this function returns)
@@ -621,10 +621,12 @@ static int clone_fn(void * clone_arg) {
 
     // notify parent that exec failed
     strcpy(buf, "ERR");
-    write(arg.sockets[0], buf, sizeof buf);
+    ret = write(arg.sockets[0], buf, sizeof buf);
+    (void)ret;
 
     // wait parent
-    read(arg.sockets[0], buf, sizeof buf);
+    ret = read(arg.sockets[0], buf, sizeof buf);
+    (void)ret;
 
     return -1;
 } // clone_fn
@@ -742,7 +744,11 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
     // wait for child response
     INFO("reading from child");
-    read(arg.sockets[1], buf, sizeof buf);
+
+    int ret;
+    ret = read(arg.sockets[1], buf, sizeof buf);
+    (void)ret;
+
     INFO("from child, got '%3s'", buf);
     if (buf[0] != 'P') {
         // child has problem to start

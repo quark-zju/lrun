@@ -1229,7 +1229,7 @@ int sc::apply_simple_filter(const char * const filter, sc::action_t action) {
                 if (*p == 0) break; else continue;
             }
             buf[name_len] = 0;
-            auto call = syscalls.find(std::string(buf));
+            std::map<std::string, int>::iterator call = syscalls.find(std::string(buf));
             if (call == syscalls.end()) {
                 WARNING("syscall not found: '%s'", buf);
             } else {

@@ -29,6 +29,11 @@
 #include <list>
 #include <sys/resource.h>
 
+// Old system does not have RLIMIT_RTTIME, define it as invalid
+#ifndef RLIMIT_RTTIME
+# define RLIMIT_RTTIME RLIMIT_NLIMITS
+#endif
+
 namespace lrun {
     class Cgroup {
         public:

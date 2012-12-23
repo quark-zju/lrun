@@ -26,6 +26,27 @@
 #include <sys/stat.h>
 #include <sys/mount.h>
 
+// If kernel does not support shared mount, MS_{REC,PRIVATE,SHARED} are missing
+#ifndef MS_REC
+# define MS_REC 0
+#endif
+
+#ifndef MS_SHARED
+# define MS_SHARED 0
+#endif
+
+#ifndef MS_PRIVATE
+# define MS_PRIVATE 0
+#endif
+
+#ifndef MS_SLAVE
+# define MS_SLAVE 0
+#endif
+
+#ifndef MS_RELATIME
+# define MS_RELATIME 0
+#endif
+
 namespace lrun {
     namespace fs {
         /**
@@ -53,7 +74,7 @@ namespace lrun {
          *         -1           file can not open
          *         -2           write error (or not complete)
          */
-        int write(const std::string& path, const std::string& content);
+        __attribute__((unused)) int write(const std::string& path, const std::string& content);
 
         /**
          * Read from file
@@ -61,7 +82,7 @@ namespace lrun {
          * @param  max_length   max length to read (not include '\0')
          * @return string       content read, empty if failed
          */
-        std::string read(const std::string& path, size_t max_length = 1024);
+        __attribute__((unused)) std::string read(const std::string& path, size_t max_length = 1024);
 
         /**
          * if path is a directory
