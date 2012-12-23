@@ -26,6 +26,19 @@
 #include <sys/stat.h>
 #include <sys/mount.h>
 
+// If kernel does not support shared mount, MS_{REC,PRIVATE,SHARED} are missing
+#ifndef MS_REC
+# define MS_REC 0
+#endif
+
+#ifndef MS_SHARED
+# define MS_SHARED 0
+#endif
+
+#ifndef MS_PRIVATE
+# define MS_PRIVATE 0
+#endif
+
 namespace lrun {
     namespace fs {
         /**
