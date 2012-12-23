@@ -74,7 +74,7 @@ namespace lrun {
          *         -1           file can not open
          *         -2           write error (or not complete)
          */
-        int write(const std::string& path, const std::string& content);
+        __attribute__((unused)) int write(const std::string& path, const std::string& content);
 
         /**
          * Read from file
@@ -82,7 +82,7 @@ namespace lrun {
          * @param  max_length   max length to read (not include '\0')
          * @return string       content read, empty if failed
          */
-        std::string read(const std::string& path, size_t max_length = 1024);
+        __attribute__((unused)) std::string read(const std::string& path, size_t max_length = 1024);
 
         /**
          * if path is a directory
