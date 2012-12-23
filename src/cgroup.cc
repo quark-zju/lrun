@@ -507,6 +507,8 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
         auto& p = (*it);
 
         int resource = p.first;
+        if (resource >= RLIMIT_NLIMITS) continue;
+
         rlimit limit, current;
         limit.rlim_cur = limit.rlim_max = p.second;
 
@@ -534,7 +536,6 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
                 CONVERT_NAME(RLIMIT_NICE);
                 CONVERT_NAME(RLIMIT_RTPRIO);
                 CONVERT_NAME(RLIMIT_RTTIME);
-                CONVERT_NAME(RLIMIT_NLIMITS);
 #undef CONVERT_NAME
                 default:
                     snprintf(limit_name, sizeof(limit_name), "0x%x", resource);
