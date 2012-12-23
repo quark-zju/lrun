@@ -185,7 +185,9 @@ void Cgroup::update_output_count() {
         long long bytes = 0;
         sscanf(spid, "%ld", &pid);
         FILE * io = fopen((string(fs::PROC_PATH) + "/" + spid + "/io").c_str(), "r");
-        (void)fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
+        int res = 0;
+        res = fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
+        (void)res;
         if (output_counter_[pid] < bytes) output_counter_[pid] = bytes;
         fclose(io);
     }
@@ -596,12 +598,14 @@ static int clone_fn(void * clone_arg) {
     // all prepared! blocking, wait for parent
     INFO("waiting for parent");
     char buf[4];
-    (void)read(arg.sockets[0], buf, sizeof buf);
+    int ret = read(arg.sockets[0], buf, sizeof buf);
+    (void)ret;
 
     // let parent know we got the message, parent then can close fd without SIGPIPE child
     INFO("got from parent: '%3s'. notify parent", buf);
     strcpy(buf, "PRE");
-    (void)write(arg.sockets[0], buf, sizeof buf);
+    ret = write(arg.sockets[0], buf, sizeof buf);
+    (void)ret;
 
     // not closing sockets[0] here, it will closed on exec
     // if exec fails, it will be closed upon process exit (aka. this function returns)
@@ -622,10 +626,12 @@ static int clone_fn(void * clone_arg) {
 
     // notify parent that exec failed
     strcpy(buf, "ERR");
-    (void)write(arg.sockets[0], buf, sizeof buf);
+    ret = write(arg.sockets[0], buf, sizeof buf);
+    (void)ret;
 
     // wait parent
-    (void)read(arg.sockets[0], buf, sizeof buf);
+    ret = read(arg.sockets[0], buf, sizeof buf);
+    (void)ret;
 
     return -1;
 } // clone_fn
@@ -743,7 +749,11 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
     // wait for child response
     INFO("reading from child");
-    (void)read(arg.sockets[1], buf, sizeof buf);
+
+    int ret;
+    ret = read(arg.sockets[1], buf, sizeof buf);
+    (void)ret;
+
     INFO("from child, got '%3s'", buf);
     if (buf[0] != 'P') {
         // child has problem to start
