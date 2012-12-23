@@ -370,7 +370,9 @@ int Cgroup::set_memory_limit(long long bytes) {
 
 static void do_privatize_filesystem(const Cgroup::spawn_arg& arg) {
     // make sure filesystem not be shared
-    if (fs::mount_set_shared("/", MS_PRIVATE | MS_REC)) {
+    // ignore this step for old systems without these features
+    int type = MS_PRIVATE | MS_REC;
+    if (type && fs::mount_set_shared("/", MS_PRIVATE | MS_REC)) {
         FATAL("can not mount --make-rprivate /");
     }
 }
