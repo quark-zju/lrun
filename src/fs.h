@@ -43,8 +43,8 @@
 # define MS_SLAVE 0
 #endif
 
-#ifndef MS_REALTIME
-# define MS_REALTIME 0
+#ifndef MS_REATIME
+# define MS_REATIME 0
 #endif
 
 namespace lrun {
