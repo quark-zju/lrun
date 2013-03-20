@@ -1,5 +1,7 @@
 Run command on Linux with resources limited.
 
+!https://api.travis-ci.org/quark-zju/lrun.png!
+
 h1. Dependencies
 
 h2. Running dependencies
