@@ -24,8 +24,12 @@ cd src
 rake install
 </pre>
 
-@lrun@ can do powerful/dangerous things. Normal users should not be allowed to run @lrun@.
-If you want to run @lrun@ using non-root user. Add that user to @lrun@ group.
+h3. User permissions
+
+@lrun@ requires @root@ permission. It can do very powerful/dangerous things.
+
+Normal users should use @sudo@ to run lrun properly.
+If you want to run @lrun@ using a trusted non-root user without @sudo@, add that user to @lrun@ group.
 
 h3. Building options
 
@@ -37,7 +41,7 @@ There are several environment variables which can affect building process:
 * *INSTALL*: @install@ binary.
 * *LRUN_GROUP*: The group which have access to run lrun directly. Default is @lrun@.
 
-h3. Archlinux
+h2. Archlinux
 
 Archlinux users can install lrun from AUR:
 
