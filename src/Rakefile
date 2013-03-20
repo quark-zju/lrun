@@ -4,11 +4,14 @@ SRC        = FileList['*.cc']
 OBJ        = SRC.ext('o')
 BIN        = 'lrun'
 CXX        = ENV['CXX'] || 'g++'
-LD         = ENV['LD'] || ENV['CXX']
+CXXFLAGS   = ENV['CXXFLAGS'] || '-O2 -Wall'
+LD         = ENV['LD'] || CXX
 PREFIX     = ENV['PREFIX'] || '/usr/local'
 INSTALL    = ENV['INSTALL'] || 'install'
 SUDO       = ENV['SUDO'] || 'sudo'
 LRUN_GROUP = ENV['LRUN_GROUP'] || 'lrun'
+TMP_DIR    = ENV['TMP'] || ENV['TEMP'] || '/tmp'
+NULL       = ENV['NULL'] || '/dev/null'
 
 CLEAN.include('*.o')
 CLOBBER.include(BIN)
@@ -36,6 +39,18 @@ def pkgconfig(params)
   @pkgconfig_results[params.to_s] ||= `pkg-config --silence-errors #{params}`.chomp
 end
 
+def try_cxxflags(*flags)
+  @cflags ||= {}
+  blank_cpp_path = File.join((Dir.tmpdir rescue TMP_DIR), ".blank.cpp")
+  unless File.exist? blank_cpp_path
+    File.write(blank_cpp_path, 'int main() { return 0; }')
+  end
+
+  @cflags[flags.to_s] ||= flags.find do |flag|
+    system "#{CXX} #{flag} #{blank_cpp_path} -E", 1 => NULL, 2 => NULL
+  end
+end
+
 def root_sh(command)
   if Process.uid == 0
     sh command
@@ -52,8 +67,8 @@ end
 task :default => [BIN]
 
 rule '.o' => '.cc' do |t|
-  flags = ['-O2', '-std=c++11', '-Wall', 
-           "-DLIBSECCOMP_VERSION_MAJOR=#{`pkg-config --modversion --silence-errors libseccomp`[0]}",
+  flags = [try_cxxflags('-std=c++11', '-std=c++0x', ''), CXXFLAGS,
+           "-DLIBSECCOMP_VERSION_MAJOR=#{pkgconfig('--modversion libseccomp')[0]}",
            pkgconfig('--cflags libseccomp')].join(' ')
   require_executable! CXX
   sh "#{CXX} #{flags} -c -o #{t.name} #{t.source}"
