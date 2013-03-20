@@ -17,3 +17,6 @@ src/[a-z_]*
 !*.h
 !*.rb
 !Makefile
+
+# include travis-ci
+!.travis.*
