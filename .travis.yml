@@ -9,6 +9,6 @@ compiler:
   - clang
 script:
   - pushd src && rake install && popd
-  - ! /usr/local/bin/lrun --version
-  - ! /usr/local/bin/lrun true
   - pushd test && make && sudo ./fs_unit_test && ./strconv_unit_test && popd
+  - /usr/local/bin/lrun --version
+  - '! /usr/local/bin/lrun true'
