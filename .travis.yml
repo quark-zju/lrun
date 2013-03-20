@@ -8,14 +8,6 @@ compiler:
   - gcc
   - clang
 before_install:
-  - ./.travis.before_install.sh
-  - uname -a
-  # Linux testing-bluebox-linux-3-1764-linux-17 2.6.32-042stab061.2 #1 SMP Fri Aug 24 09:07:21 MSK 2012 x86_64 x86_64 x86_64 GNU/Linux
-  - ruby --version
-  # - utils/check_linux_config.rb
-  # utils/check_linux_config.rb:35:in `<main>': Can not load config (RuntimeError)
-  - mount
-  - ps aux
-  - cat /proc/self/mountinfo
-  - cat /proc/self/cgroup
-script: cd src && rake
+  # - ./.travis.before_install.sh
+script:
+  - cd src && rake install
