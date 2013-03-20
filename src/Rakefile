@@ -1,37 +1,78 @@
 require 'rake/clean'
 
-SRC     = FileList['*.cc']
-OBJ     = SRC.ext('o')
-BIN     = 'lrun'
-LD      = ENV['LD'] || 'g++'
-CXX     = ENV['CXX'] || 'g++'
-PREFIX  = ENV['PREFIX'] || '/usr/local'
-INSTALL = ENV['INSTALL'] || '/usr/bin/env install -c -D'
+SRC        = FileList['*.cc']
+OBJ        = SRC.ext('o')
+BIN        = 'lrun'
+CXX        = ENV['CXX'] || 'g++'
+LD         = ENV['LD'] || ENV['CXX']
+PREFIX     = ENV['PREFIX'] || '/usr/local'
+INSTALL    = ENV['INSTALL'] || 'install'
+SUDO       = ENV['SUDO'] || 'sudo'
+LRUN_GROUP = ENV['LRUN_GROUP'] || 'lrun'
 
 CLEAN.include('*.o')
 CLOBBER.include(BIN)
 
+# Helper methods
+# --------------
+
+def executable_exists?(name)
+  # only interested in first word in name
+  name = name.split.first
+  @executable_exists ||= {}
+  # assuming we are in Linux, check $PATH
+  @executable_exists[name] = ENV['PATH'].split(?:).any? do |dir|
+    File.executable? File.join(dir, name)
+  end
+end
+
+def require_executable!(name)
+  raise "required '#{name}' not found" unless executable_exists? name
+end
+
+def pkgconfig(params)
+  require_executable! 'pkg-config'
+  @pkgconfig_results ||= {}
+  @pkgconfig_results[params.to_s] ||= `pkg-config --silence-errors #{params}`.chomp
+end
+
+def root_sh(command)
+  if Process.uid == 0
+    sh command
+  else
+    require_executable! SUDO
+    sh "#{SUDO} #{command}"
+  end
+end
+
+
+# Rake tasks
+# ----------
+
 task :default => [BIN]
 
 rule '.o' => '.cc' do |t|
-  flags = ['-O2', '-std=c++0x', '-Wall', 
+  flags = ['-O2', '-std=c++11', '-Wall', 
            "-DLIBSECCOMP_VERSION_MAJOR=#{`pkg-config --modversion --silence-errors libseccomp`[0]}",
-           `pkg-config --silence-errors --cflags libseccomp`.chomp].join(' ')
+           pkgconfig('--cflags libseccomp')].join(' ')
+  require_executable! CXX
   sh "#{CXX} #{flags} -c -o #{t.name} #{t.source}"
 end
 
 file BIN => OBJ do |t|
-  flags = `pkg-config --silence-errors --libs libseccomp`.chomp
-  sh "#{LD} #{flags} -o #{t.name} #{t.prerequisites * ' '}"
+  require_executable! LD
+  sh "#{LD} #{pkgconfig('--libs libseccomp')} -o #{t.name} #{t.prerequisites * ' '}"
 end
 
-task :install => BIN do |t|
-  cmd = "#{INSTALL} -m4555 -oroot -groot -s #{BIN} #{ENV['DESTDIR']}#{PREFIX}/bin/lrun"
-  # easier for non-root users
-  if Process.uid == 0
-    sh cmd
-  else
-    sh "sudo #{cmd}"
-  end
+task :lrun_group do |t|
+  # check group
+  next if File.read('/etc/group').lines.any? { |line| /^#{LRUN_GROUP}:/ =~ line }
+  # add lrun group
+  require_executable! 'groupadd'
+  root_sh "groupadd #{LRUN_GROUP}"
 end
 
+task :install => [BIN, :lrun_group] do |t|
+  require_executable! INSTALL
+  root_sh "#{INSTALL} -D -m2555 -oroot -g#{LRUN_GROUP} -s #{BIN} #{ENV['DESTDIR']}#{PREFIX}/bin/lrun"
+end
