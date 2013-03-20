@@ -11,3 +11,5 @@ before_install:
   # - ./.travis.before_install.sh
 script:
   - cd src && rake install
+  - cd test && make && sudo ./cgroup_unit_test && sudo ./fs_unit_test && ./strconv_unit_test
+
