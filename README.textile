@@ -2,16 +2,42 @@ Run command on Linux with resources limited.
 
 h1. Dependencies
 
-* Linux kernel >= 2.6.26, you can check kernel config by @utils/check_linux_config.rb@
-* g++, 4.4 should work, 4.6 and above recommended
-* (Optionally) libsecomp ~= 1.0.0 and Linux kernel >= 3.5, to use syscall whitelist / blacklist
+h2. Running dependencies
+
+* *linux*: kernel >= 2.6.26. you can check kernel config by @utils/check_linux_config.rb@.
+* *libseccomp*: (optionally) to enable syscall filtering feature.
+
+h2. Building dependencies
+
+* *g++*: g++ 4.6 and above recommended, 4.4 should work as well. Or clang++
+* *install*: to install binaries.
+* *pkg-config*: to get information about libseccomp.
+* *groupadd*: to create @lrun@ group.
+* *sudo*: (optionally) to install via a non-root user.
 
 h1. Installation
+
+h2. Build from source
 
 <pre>
 cd src
 rake install
 </pre>
+
+@lrun@ can do powerful/dangerous things. Normal users should not be allowed to run @lrun@.
+If you want to run @lrun@ using non-root user. Add that user to @lrun@ group.
+
+h3. Building options
+
+There are several environment variables which can affect building process:
+
+* *PREFIX*: Install destination. Default is @/usr/local@.
+* *CXX*: The C++ compiler. For example, @clang++@ or @g++@
+* *LD*: The linker. Default is the same as @CXX@.
+* *INSTALL*: @install@ binary.
+* *LRUN_GROUP*: The group which have access to run lrun directly. Default is @lrun@.
+
+h3. Archlinux
 
 Archlinux users can install lrun from AUR:
 
