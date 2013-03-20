@@ -1,0 +1,17 @@
+language: cpp
+rvm:
+  - 1.9.3
+compiler:
+  - gcc
+  - clang
+before_install:
+  - ./.travis.before_install.sh
+  - uname -a
+  - ruby --version
+  - utils/check_linux_config.rb
+  - mount
+  - cat /etc/mounts
+  - cat /proc/self/mountinfo
+  - ps aux
+  - cat /proc/self/cgroup
+script: cd src && rake
