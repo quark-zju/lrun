@@ -8,6 +8,6 @@ compiler:
   - gcc
   - clang
 script:
-  - cd src && rake install
-  - cd test && make && sudo ./cgroup_unit_test && sudo ./fs_unit_test && ./strconv_unit_test
+  - pushd src && rake install && popd
+  - pushd test && make && sudo ./cgroup_unit_test && sudo ./fs_unit_test && ./strconv_unit_test && popd
 
