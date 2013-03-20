@@ -1,6 +1,6 @@
 Run command on Linux with resources limited.
 
-!https://api.travis-ci.org/quark-zju/lrun.png!
+!https://api.travis-ci.org/quark-zju/lrun.png!:https://travis-ci.org/quark-zju/lrun
 
 h1. Dependencies
 
