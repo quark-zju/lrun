@@ -7,7 +7,8 @@ rvm:
 compiler:
   - gcc
   - clang
-before_install:
-  # - ./.travis.before_install.sh
 script:
-  - cd src && rake install
+  - pushd src && rake install && popd
+  - pushd test && make && sudo ./fs_unit_test && ./strconv_unit_test && popd
+  - /usr/local/bin/lrun --version
+  - '! /usr/local/bin/lrun true'
