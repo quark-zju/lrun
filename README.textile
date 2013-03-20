@@ -11,11 +11,12 @@ h2. Running dependencies
 
 h2. Building dependencies
 
+* *rake*: process Rakefile.
 * *g++*: g++ 4.6 and above recommended, 4.4 should work as well. Or clang++
-* *install*: to install binaries.
-* *pkg-config*: to get information about libseccomp.
-* *groupadd*: to create @lrun@ group.
-* *sudo*: (optionally) to install via a non-root user.
+* *install*: install binaries.
+* *pkg-config*: get information about libseccomp.
+* *groupadd*: create @lrun@ group.
+* *sudo*: (optionally) install via a non-root user.
 
 h1. Installation
 
