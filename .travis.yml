@@ -7,5 +7,8 @@ rvm:
 compiler:
   - gcc
   - clang
+env:
+  - NODEBUG=1
+  - ''
 script:
   - pushd src && rake install && popd
