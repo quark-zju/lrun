@@ -48,6 +48,20 @@ extern double now();
 }
 #endif
 
+
+#ifdef NODEBUG
+# define SHOW_SOURCE_LOCATION ;
+# define PRINT_TIMESTAMP ;
+#else
+# define SHOW_SOURCE_LOCATION \
+    if (DEBUG_ENABLED) fprintf(stderr, "  at %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+# define PRINT_TIMESTAMP \
+  {   \
+    if (DEBUG_TIMESTAMP) fprintf(stderr, "[%8.3f]", TIMESTAMP); \
+    if (DEBUG_PID) fprintf(stderr, "[%6d] ", (int)getpid()); \
+  }
+#endif
+
 extern double DEBUG_START_TIME;
 extern int DEBUG_ENABLED;
 extern int DEBUG_TIMESTAMP;
@@ -56,17 +70,7 @@ extern int DEBUG_PID;
 
 #define NOW now()
 #define TIMESTAMP (now() - DEBUG_START_TIME)
-
-#define SHOW_SOURCE_LOCATION \
-    if (DEBUG_ENABLED) fprintf(stderr, "  at %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
 #define DEBUG_DO if (DEBUG_ENABLED)
-
-#define PRINT_TIMESTAMP \
-{   \
-    if (DEBUG_TIMESTAMP) fprintf(stderr, "[%8.3f]", TIMESTAMP); \
-    if (DEBUG_PID) fprintf(stderr, "[%6d] ", (int)getpid()); \
-}
 
 #define FATAL(...) \
 {   \

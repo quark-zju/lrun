@@ -1,17 +1,18 @@
 require 'rake/clean'
 
-SRC        = FileList['*.cc']
-OBJ        = SRC.ext('o')
-BIN        = 'lrun'
-CXX        = ENV['CXX'] || 'g++'
-CXXFLAGS   = ENV['CXXFLAGS'] || '-O2 -Wall'
-LD         = ENV['LD'] || CXX
-PREFIX     = ENV['PREFIX'] || '/usr/local'
-INSTALL    = ENV['INSTALL'] || 'install'
-SUDO       = ENV['SUDO'] || 'sudo'
-LRUN_GROUP = ENV['LRUN_GROUP'] || 'lrun'
-TMP_DIR    = ENV['TMP'] || ENV['TEMP'] || '/tmp'
-NULL       = ENV['NULL'] || '/dev/null'
+SRC          = FileList['*.cc']
+OBJ          = SRC.ext('o')
+BIN          = 'lrun'
+CXX          = ENV['CXX'] || 'g++'
+CXXFLAGS     = ENV['CXXFLAGS'] || '-O2 -Wall'
+LD           = ENV['LD'] || CXX
+PREFIX       = ENV['PREFIX'] || '/usr/local'
+INSTALL      = ENV['INSTALL'] || 'install'
+SUDO         = ENV['SUDO'] || 'sudo'
+LRUN_GROUP   = ENV['LRUN_GROUP'] || 'lrun'
+TMP_DIR      = ENV['TMP'] || ENV['TEMP'] || '/tmp'
+NULL         = ENV['NULL'] || '/dev/null'
+NODEBUG_FLAG = ENV['NODEBUG'] ? '-DNODEBUG' : ''
 
 CLEAN.include('*.o')
 CLOBBER.include(BIN)
@@ -67,7 +68,7 @@ end
 task :default => [BIN]
 
 rule '.o' => '.cc' do |t|
-  flags = [try_cxxflags('-std=c++11', '-std=c++0x', ''), CXXFLAGS,
+  flags = [try_cxxflags('-std=c++11', '-std=c++0x', ''), CXXFLAGS, NODEBUG_FLAG,
            "-DLIBSECCOMP_VERSION_MAJOR=#{pkgconfig('--modversion libseccomp')[0]}",
            pkgconfig('--cflags libseccomp')].join(' ')
   require_executable! CXX
