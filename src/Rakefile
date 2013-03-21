@@ -89,5 +89,5 @@ end
 
 task :install => [BIN, :lrun_group] do |t|
   require_executable! INSTALL
-  root_sh "#{INSTALL} -D -m2555 -oroot -g#{LRUN_GROUP} -s #{BIN} #{ENV['DESTDIR']}#{PREFIX}/bin/lrun"
+  root_sh "#{INSTALL} -D -m4550 -oroot -g#{LRUN_GROUP} -s #{BIN} #{ENV['DESTDIR']}#{PREFIX}/bin/lrun"
 end
