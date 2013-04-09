@@ -44,6 +44,7 @@ int __libc_start_main(main_t main, int argc,
         "/dash\n",
         "/zsh\n",
         "/sh\n",
+        "/make\n",
     };
 
     int s, i;
