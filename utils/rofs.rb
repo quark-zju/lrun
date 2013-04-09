@@ -32,6 +32,7 @@
 
 ESSENTIAL_DIRS = ['/usr', '/bin', '/opt', '/lib', '/lib64', '/etc', '/dev', '/tmp', '/proc']
 MIRRORED_DIRS  = ['/usr', '/bin', '/opt', '/lib', '/lib64', '/etc/alternatives']
+PRELOAD_LIBS   = ['/usr/local/lib/libexecwhitelist.so']
 DEV_NODES      = {null: 3, zero: 5, random: 8, urandom: 9, full: 7}
 
 ROFS_DEST      = ENV['ROFS_DEST'] || '/rofs'
@@ -122,6 +123,14 @@ end
 if ESSENTIAL_DIRS.include?('/etc')
   File.open(File.join(ROFS_DEST, 'etc/passwd'), 'w') do |f|
     f.puts "guest:x:2000:200:bin:/bin:/bin/false"
+  end
+end
+
+# Preload libraries
+PRELOAD_LIBS.select! { |path| File.exists?(path) }
+unless PRELOAD_LIBS.empty?
+  File.open(File.join(ROFS_DEST, 'etc/ld.so.preload'), 'w') do |f|
+    f.puts PRELOAD_LIBS.join(' ')
   end
 end
 
