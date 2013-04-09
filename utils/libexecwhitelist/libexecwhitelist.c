@@ -20,13 +20,15 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
+#define _BSD_SOURCE // readlink
 #include <dlfcn.h>
 #include <stdlib.h> // exit
-#include <string.h> // strstr
+#include <string.h> // strstr, memset
 #include <link.h>   // ElfW
 #include <errno.h>  // EPERM
 #include <unistd.h> // readlink
 #include <seccomp.h>
+#include <stdio.h>
 
 typedef int (*main_t)(int, char **, char **);
 
@@ -47,7 +49,8 @@ int __libc_start_main(main_t main, int argc,
         "/make\n",
     };
 
-    int s, i;
+    int i;
+    ssize_t len;
     char buf[1024];
 	void *libc;
     scmp_filter_ctx ctx = NULL;
@@ -60,24 +63,33 @@ int __libc_start_main(main_t main, int argc,
 		void (*rtld_fini) (void),
 		void *__unbounded stack_end);
 
+    // Get __libc_start_main entry point
 	libc = dlopen("libc.so.6", RTLD_LOCAL  | RTLD_LAZY);
-	if (!libc) exit(-100);
+	if (!libc) exit(-1);
 
 	libc_start_main = dlsym(libc, "__libc_start_main");
-	if (!libc_start_main) exit(-100);
+	if (!libc_start_main) exit(-2);
 
-    // If current exe is in whitelist, do nothing
-    // otherwise apply no exec policy
-    buf[0]     = '/';
-    s          = (int)readlink("/proc/self/exe", buf + 1, sizeof(buf) - 4);
-    buf[s + 1] = '\n';
-    buf[s + 2] = 0;
+    // Read exe path
+    memset(buf, 0, sizeof(buf));
+    buf[0]       = '/';
+    len          = readlink("/proc/self/exe", buf + 1, sizeof(buf) - 4);
 
+    // Do nothing if readlink fails
+    if (len < 0) goto out;
+
+    // Set string end flag 
+    if (len < sizeof(buf) - 2) {
+        buf[len + 1] = '\n';
+        buf[len + 2] = 0;
+    }
+
+    // Check exe path against known whitelist
     for (i = 0; i < sizeof(whitelist) / sizeof(whitelist[0]); ++i) {
         if (strstr(buf, whitelist[i])) goto out;
     }
 
-    // apply fork, exec limit via libseccomp
+    // Apply fork, exec limit via libseccomp
     ctx = seccomp_init(SCMP_ACT_ALLOW);
     if (!ctx) goto out;
     if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(execve), 0)) goto out;
