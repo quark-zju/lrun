@@ -462,8 +462,6 @@ int main(int argc, char * argv[]) {
         }
     }
 
-    // Detect shared mounts
-
     // reset cpu / memory usage and killall existing processes
     // not needed if cg can be guarnteed that is newly created
     if (cg.killall()) {
