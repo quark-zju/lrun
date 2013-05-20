@@ -23,15 +23,7 @@
 #include "seccomp.h"
 namespace sc = lrun::seccomp;
 
-
-#ifndef LIBSECCOMP_VERSION_MAJOR
-# define LIBSECCOMP_VERSION_MAJOR 0
-#endif
-
-#define DO_EXPAND(VAL)  VAL ## 1
-#define EXPAND(VAL)     DO_EXPAND(VAL)
-
-#if defined(LIBSECCOMP_VERSION_MAJOR) && EXPAND(LIBSECCOMP_VERSION_MAJOR) == 11
+#if defined(LIBSECCOMP_VERSION_MAJOR) && LIBSECCOMP_VERSION_MAJOR <= 2 && LIBSECCOMP_VERSION_MAJOR > 0
 # define LIBSECCOMP_ENABLED
 #else
 # undef LIBSECCOMP_ENABLED
@@ -1318,7 +1310,7 @@ int sc::supported() {
 
 #else
 
-# warning libseccomp version 1.x not found
+# warning libseccomp version 1.x or 2.x not found
 
 int sc::apply_simple_filter(const char * const filter, sc::action_t action) {
     return 1;
