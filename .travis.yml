@@ -12,5 +12,5 @@ env:
   - ''
 script:
   - pushd src && rake install && popd
-  - ls -l src/lrun /usr/local/bin/lrun
+  - ls -l src/lrun /usr/local/sbin/lrun
   
