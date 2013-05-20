@@ -10,6 +10,7 @@ PREFIX       = ENV['PREFIX'] || '/usr/local'
 INSTALL      = ENV['INSTALL'] || 'install'
 SUDO         = ENV['SUDO'] || 'sudo'
 LRUN_GROUP   = ENV['LRUN_GROUP'] || 'lrun'
+LRUN_GID     = ENV['LRUN_GID'] || '593'
 TMP_DIR      = ENV['TMP'] || ENV['TEMP'] || '/tmp'
 NULL         = ENV['NULL'] || '/dev/null'
 NODEBUG_FLAG = ENV['NODEBUG'] ? '-DNODEBUG' : ''
@@ -86,10 +87,10 @@ task :lrun_group do |t|
   next if File.read('/etc/group').lines.any? { |line| /^#{LRUN_GROUP}:/ =~ line }
   # add lrun group
   require_executable! GROUPADD
-  root_sh "#{GROUPADD} #{LRUN_GROUP}"
+  root_sh "#{GROUPADD} -r #{LRUN_GID ? "-g #{LRUN_GID}" : ''} #{LRUN_GROUP}"
 end
 
 task :install => [BIN, :lrun_group] do |t|
   require_executable! INSTALL
-  root_sh "#{INSTALL} -D -m4550 -oroot -g#{LRUN_GROUP} -s #{BIN} #{ENV['DESTDIR']}#{PREFIX}/bin/lrun"
+  root_sh "#{INSTALL} -D -m4550 -oroot -g#{LRUN_GROUP} -s #{BIN} #{ENV['DESTDIR']}#{PREFIX}/sbin/lrun"
 end
