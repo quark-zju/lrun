@@ -8,8 +8,8 @@ h2. Dependencies
 
 h3. Running dependencies
 
-* *linux*: kernel >= 2.6.26. you can check kernel config by @utils/check_linux_config.rb@.
-* *libseccomp*: (optionally) to enable syscall filtering feature.
+* *linux*: (>= 2.6.26) you can check kernel config by @utils/check_linux_config.rb@.
+* *libseccomp*: (optionally, 1.x or 2.x) to enable syscall filtering feature.
 
 h3. Building dependencies
 
