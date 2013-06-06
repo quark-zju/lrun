@@ -7,5 +7,5 @@ libexecwhitelist.so: libexecwhitelist.c
 clean:
 	rm -f libexecwhitelist.so
 
-install:
+install: libexecwhitelist.so
 	install -m555 -oroot -groot -s libexecwhitelist.so $(PREFIX)/lib/libexecwhitelist.so
