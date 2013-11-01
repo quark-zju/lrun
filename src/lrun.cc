@@ -52,6 +52,7 @@ static struct {
     bool enable_devices_whitelist;
     bool enable_network;
     bool enable_user_proc_namespace;
+    bool pass_exitcode;
     useconds_t interval;
     string cgname;
     Cgroup* active_cgroup;
@@ -85,6 +86,7 @@ static void print_help() {
             "                                null, zero, full, random, urandom\n"
             "  --reset-env       bool        Clean environment variables.\n"
             "  --network         bool        Whether network access is permitted.\n"
+            "  --pass-exitcode   bool        Discard lrun exit code, pass exit code as is.\n"
             "  --chroot          path        Chroot to specified path before exec.\n"
             "  --chdir           path        Chdir to specified path after chroot.\n"
             "  --nice            nice        Add nice with specified value.\n"
@@ -146,7 +148,7 @@ static void print_help() {
             "\n"
             "Default options:\n"
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
-            "       --reset-env false --interval 0.05 \\\n"
+            "       --reset-env false --interval 0.05 --pass-exitcode false\\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
             "       --max-rtprio 0 --nice 0\\\n"
             "       --uid $UID --gid $GID\n"
@@ -157,7 +159,7 @@ static void print_help() {
 
 static void print_version() {
     printf("lrun version " VERSION "\n"
-           "Copyright (C) 2012 WU Jun <quark@zju.edu.cn>\n");
+           "Copyright (C) 2012-2013 WU Jun <quark@zju.edu.cn>\n");
     exit(0);
 }
 
@@ -172,6 +174,7 @@ static void parse_options(int argc, char * argv[]) {
     config.enable_user_proc_namespace = true;
     config.interval = (useconds_t)(0.05 * 1000000);
     config.active_cgroup = NULL;
+    config.pass_exitcode = false;
 
     // arg settings
     config.arg.nice = 0;
@@ -255,6 +258,9 @@ static void parse_options(int argc, char * argv[]) {
         } else if (option == "network") {
             REQUIRE_NARGV(1);
             config.enable_network = NEXT_BOOL_ARG;
+        } else if (option == "pass-exitcode") {
+            REQUIRE_NARGV(1);
+            config.pass_exitcode = NEXT_BOOL_ARG;
         } else if (option == "chroot") {
             REQUIRE_NARGV(1);
             config.arg.chroot_path = NEXT_STRING_ARG;
@@ -644,7 +650,7 @@ int main(int argc, char * argv[]) {
     ret = write(3, status_report, strlen(status_report));
     (void)ret;
 
-    clean_cg_exit(cg, 0);
+    clean_cg_exit(cg, config.pass_exitcode ? WEXITSTATUS(stat) : EXIT_SUCCESS);
     return 0;
 }
 
