@@ -481,7 +481,7 @@ int main(int argc, char * argv[]) {
     }
 
     // fd 3 should not be inherited by child process
-	if (fcntl(3, F_SETFD, FD_CLOEXEC)) {
+    if (fcntl(3, F_SETFD, FD_CLOEXEC)) {
         // ignore bad fd error
         if (errno != EBADF) {
             ERROR("can not set FD_CLOEXEC on fd 3");
