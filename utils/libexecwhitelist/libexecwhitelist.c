@@ -33,12 +33,12 @@
 typedef int (*main_t)(int, char **, char **);
 
 int __libc_start_main(main_t main, int argc, 
-	char *__unbounded *__unbounded ubp_av,
-	ElfW(auxv_t) *__unbounded auxvec,
-	__typeof (main) init,
-	void (*fini) (void),
-	void (*rtld_fini) (void), void *__unbounded
-	stack_end)
+    char *__unbounded *__unbounded ubp_av,
+    ElfW(auxv_t) *__unbounded auxvec,
+    __typeof (main) init,
+    void (*fini) (void),
+    void (*rtld_fini) (void), void *__unbounded
+    stack_end)
 {
     static char whitelist[][8] = {
         "/env\n",
@@ -52,28 +52,28 @@ int __libc_start_main(main_t main, int argc,
     int i;
     ssize_t len;
     char buf[1024];
-	void *libc;
+    void *libc;
     scmp_filter_ctx ctx = NULL;
-	int (*libc_start_main)(main_t main,
-		int,
-		char *__unbounded *__unbounded,
-		ElfW(auxv_t) *,
-		__typeof (main),
-		void (*fini) (void),
-		void (*rtld_fini) (void),
-		void *__unbounded stack_end);
+    int (*libc_start_main)(main_t main,
+        int,
+        char *__unbounded *__unbounded,
+        ElfW(auxv_t) *,
+        __typeof (main),
+        void (*fini) (void),
+        void (*rtld_fini) (void),
+        void *__unbounded stack_end);
 
     // Get __libc_start_main entry point
-	libc = dlopen("libc.so.6", RTLD_LOCAL  | RTLD_LAZY);
-	if (!libc) exit(-1);
+    libc = dlopen("libc.so.6", RTLD_LOCAL  | RTLD_LAZY);
+    if (!libc) exit(-1);
 
-	libc_start_main = dlsym(libc, "__libc_start_main");
-	if (!libc_start_main) exit(-2);
+    libc_start_main = dlsym(libc, "__libc_start_main");
+    if (!libc_start_main) exit(-2);
 
     // Read exe path
     memset(buf, 0, sizeof(buf));
-    buf[0]       = '/';
-    len          = readlink("/proc/self/exe", buf + 1, sizeof(buf) - 4);
+    buf[0] = '/';
+    len    = readlink("/proc/self/exe", buf + 1, sizeof(buf) - 4);
 
     // Do nothing if readlink fails
     if (len < 0) goto out;
@@ -97,6 +97,6 @@ int __libc_start_main(main_t main, int argc,
 
 out:
     if (ctx) seccomp_release(ctx);
-	return ((*libc_start_main)(main, argc, ubp_av, auxvec,
+    return ((*libc_start_main)(main, argc, ubp_av, auxvec,
                  init, fini, rtld_fini, stack_end));
 }
