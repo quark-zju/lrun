@@ -650,6 +650,10 @@ int main(int argc, char * argv[]) {
     ret = write(3, status_report, strlen(status_report));
     (void)ret;
 
+    // close output earlier so the process read the status can start to do other things.
+    ret = close(3);
+    (void)ret;
+
     clean_cg_exit(cg, config.pass_exitcode ? WEXITSTATUS(stat) : EXIT_SUCCESS);
     return 0;
 }
