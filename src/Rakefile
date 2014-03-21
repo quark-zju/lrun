@@ -35,7 +35,7 @@ def executable_exists?(name)
   name = name.split.first
   @executable_exists ||= {}
   # assuming we are in Linux, check $PATH
-  @executable_exists[name] = ENV['PATH'].split(?:).any? do |dir|
+  @executable_exists[name] = ENV['PATH'].split(':').any? do |dir|
     File.executable? File.join(dir, name)
   end
 end
@@ -58,7 +58,7 @@ def try_cxxflags(*flags)
   end
 
   @cflags[flags.to_s] ||= flags.find do |flag|
-    system "#{CXX} #{flag} #{blank_cpp_path} -E", 1 => NULL, 2 => NULL
+    system "#{CXX} #{flag} #{blank_cpp_path} -E 1>#{NULL} 2>#{NULL}"
   end
 end
 
