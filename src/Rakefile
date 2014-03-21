@@ -79,7 +79,7 @@ end
 
 file BIN => OBJ do |t|
   require_executable! LD
-  sh "#{LD} #{pkgconfig('--libs libseccomp')} -o #{t.name} #{t.prerequisites * ' '}"
+  sh "#{LD} -o #{t.name} #{t.prerequisites * ' '} #{pkgconfig('--libs libseccomp')}"
 end
 
 task :lrun_group do |t|
