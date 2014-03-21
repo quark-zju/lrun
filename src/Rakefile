@@ -19,6 +19,14 @@ GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 CLEAN.include('*.o')
 CLOBBER.include(BIN)
 
+# Ruby 1.8 missing features
+# -------------------------
+unless File.respond_to?(:write)
+  def File.write(filename, content)
+    File.open(filename, 'w') {|f| f.write(content)}
+  end
+end
+
 # Helper methods
 # --------------
 
