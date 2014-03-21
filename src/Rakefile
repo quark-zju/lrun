@@ -79,7 +79,7 @@ task :default => [BIN]
 
 rule '.o' => '.cc' do |t|
   flags = [try_cxxflags('-std=c++11', '-std=c++0x', ''), CXXFLAGS, NODEBUG_FLAG,
-           "-DLIBSECCOMP_VERSION_MAJOR=#{pkgconfig('--modversion libseccomp')[0].to_i}",
+           "-DLIBSECCOMP_VERSION_MAJOR=#{pkgconfig('--modversion libseccomp').to_i}",
            pkgconfig('--cflags libseccomp')].join(' ')
   require_executable! CXX
   sh "#{CXX} #{flags} -c -o #{t.name} #{t.source}"
