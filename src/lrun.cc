@@ -569,8 +569,7 @@ int main(int argc, char * argv[]) {
         }
 
         // check memory limit
-        long long memory_limit = cg.memory_limit();
-        if (cg.memory_peak() >= memory_limit && memory_limit > 0) {
+        if (cg.memory_peak() >= config.memory_limit && config.memory_limit > 0) {
             exceeded_limit = "MEMORY";
             break;
         }
