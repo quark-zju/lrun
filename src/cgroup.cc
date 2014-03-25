@@ -356,11 +356,11 @@ int Cgroup::set_memory_limit(long long bytes) {
 
     if (bytes <= 0) {
         // read base (parent) cgroup properties
-        e *= inherit(CG_MEMORY, "memory.memsw.limit_in_bytes");
         e *= inherit(CG_MEMORY, "memory.limit_in_bytes");
+        e *= inherit(CG_MEMORY, "memory.memsw.limit_in_bytes");
     } else {
-        e *= set(CG_MEMORY, "memory.memsw.limit_in_bytes", strconv::from_longlong(bytes));
         e *= set(CG_MEMORY, "memory.limit_in_bytes", strconv::from_longlong(bytes));
+        e *= set(CG_MEMORY, "memory.memsw.limit_in_bytes", strconv::from_longlong(bytes));
     }
 
     return e ? -1 : 0;
