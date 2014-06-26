@@ -32,6 +32,10 @@
 
 typedef int (*main_t)(int, char **, char **);
 
+#ifndef __unbounded
+# define __unbounded
+#endif
+
 int __libc_start_main(main_t main, int argc, 
     char *__unbounded *__unbounded ubp_av,
     ElfW(auxv_t) *__unbounded auxvec,

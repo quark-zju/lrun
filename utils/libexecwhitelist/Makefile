@@ -1,8 +1,8 @@
-CC=$(CXX)
+CC ?= gcc
 PREFIX ?= /usr/local
 
 libexecwhitelist.so: libexecwhitelist.c
-	gcc $^ -fPIC -ldl -shared -lseccomp -o $@
+	$(CC) $^ $(CFLAGS) -fPIC -ldl -shared -lseccomp -o $@
 
 clean:
 	rm -f libexecwhitelist.so
