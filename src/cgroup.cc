@@ -404,7 +404,7 @@ static void do_chroot(const Cgroup::spawn_arg& arg) {
 
 static void do_mount_proc(const Cgroup::spawn_arg& arg) {
     // mount /proc if pid namespace is enabled
-    if (arg.clone_flags & CLONE_NEWPID) {
+    if ((arg.clone_flags & CLONE_NEWPID) && fs::is_dir("/proc")) {
         INFO("mount /proc");
         if (mount(NULL, "/proc", "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
             FATAL("mount procfs failed");
