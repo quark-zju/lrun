@@ -1,9 +1,6 @@
 # no object files
 *.o
 
-# no hidden files/directories
-.*
-
 # no kdevelop project files
 *.kdev4
 
@@ -17,6 +14,3 @@ src/[a-z_]*
 !*.h
 !*.rb
 !Makefile
-
-# include travis-ci
-!.travis.*
