@@ -16,11 +16,15 @@ NULL         = ENV['NULL'] || '/dev/null'
 NODEBUG_FLAG = ENV['NDEBUG'] ? '-DNDEBUG' : ''
 GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 
+FALLBACK_VER = 'v0.9.5'
+
 CLEAN.include('*.o')
 CLOBBER.include(BIN)
 
+
 # Ruby 1.8 missing features
 # -------------------------
+
 unless File.respond_to?(:write)
   def File.write(filename, content)
     File.open(filename, 'w') {|f| f.write(content)}
@@ -62,6 +66,18 @@ def try_cxxflags(*flags)
   end
 end
 
+def get_version
+  @version ||= \
+    begin
+      git_version = if Dir.exist?('../.git')
+                      (`git describe --abbrev=4 --tags --always --dirty` rescue '').chomp
+                    else
+                      ''
+                    end
+      git_version.empty? ? "#{FALLBACK_VER}-b#{Time.now.strftime('%Y%m%d')}" : git_version
+    end
+end
+
 def root_sh(command)
   if Process.uid == 0
     sh command
@@ -80,6 +96,7 @@ task :default => [BIN]
 rule '.o' => '.cc' do |t|
   flags = [try_cxxflags('-std=c++11', '-std=c++0x', ''), CXXFLAGS, NODEBUG_FLAG,
            "-DLIBSECCOMP_VERSION_MAJOR=#{pkgconfig('--modversion libseccomp').to_i}",
+           "-DVERSION=\\\"#{get_version}\\\"",
            pkgconfig('--cflags libseccomp')].join(' ')
   require_executable! CXX
   sh "#{CXX} #{flags} -c -o #{t.name} #{t.source}"

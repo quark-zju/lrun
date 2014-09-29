@@ -161,7 +161,7 @@ static void print_help() {
 }
 
 static void print_version() {
-    printf("lrun version " VERSION "\n"
+    printf("lrun " VERSION "\n"
            "Copyright (C) 2012-2014 Jun Wu <quark@zju.edu.cn>\n");
     exit(0);
 }

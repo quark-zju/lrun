@@ -17,12 +17,12 @@ h3. Build dependencies
 * *g++*: g++ 4.6 and above recommended, 4.4 should work as well. Or clang++
 * *install*: install binaries.
 * *pkg-config*: get information about libseccomp.
-* *git*: get version information.
+* *git*: (optional) get version information.
 
 h3. Installation dependencies
 
 * *groupadd*: create @lrun@ group.
-* *sudo*: (optionally) install via a non-root user.
+* *sudo*: (optional) install via a non-root user.
 
 h2. Installation
 

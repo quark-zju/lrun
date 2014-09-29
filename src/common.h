@@ -30,7 +30,9 @@
 # define _GNU_SOURCE 1
 #endif
 
-#define VERSION "0.9.5"
+#ifndef VERSION
+# define VERSION "unknown"
+#endif
 
 #include <cstdio>
 #include <cstdlib>
