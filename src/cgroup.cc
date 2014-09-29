@@ -512,7 +512,6 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
         if (resource == RLIMIT_CPU) ++limit.rlim_max;
         getrlimit(resource, &current);
 
-#ifndef NODEBUG
         DEBUG_DO {
             char limit_name[16];
             switch (resource) {
@@ -541,7 +540,6 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
                  (int)current.rlim_cur, (int)limit.rlim_cur,
                  (int)current.rlim_max, (int)limit.rlim_max);
         }
-#endif
 
         if (setrlimit(resource, &limit)) {
             WARNING("can not set rlimit %d", resource);
@@ -660,7 +658,6 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     void * stack = (void*)((char*)alloca(stack_size) + stack_size);
     char buf[] = "RUN";
 
-#ifndef NODEBUG
     DEBUG_DO {
         int v = clone_flags;
         string s;
@@ -726,7 +723,6 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         #undef TEST_FLAG
         INFO("clone flags = 0x%x = %s0x%x", (int)clone_flags, s.c_str(), v);
     }
-#endif
 
     pid_t child_pid;
     child_pid = clone(clone_fn, stack, clone_flags, &arg);

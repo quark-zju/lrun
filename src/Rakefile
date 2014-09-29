@@ -13,7 +13,7 @@ LRUN_GROUP   = ENV['LRUN_GROUP'] || 'lrun'
 LRUN_GID     = ENV['LRUN_GID'] || '593'
 TMP_DIR      = ENV['TMP'] || ENV['TEMP'] || '/tmp'
 NULL         = ENV['NULL'] || '/dev/null'
-NODEBUG_FLAG = ENV['NODEBUG'] ? '-DNODEBUG' : ''
+NODEBUG_FLAG = ENV['NDEBUG'] ? '-DNDEBUG' : ''
 GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 
 CLEAN.include('*.o')

@@ -113,8 +113,10 @@ static void print_help() {
             "                                not set, lrun will pick an unique cgroup name \n"
             "                                and destroy the cgroup upon exit.\n"
             "  --interval        seconds     Set interval status update interval.\n"
+#ifndef NDEBUG
             "  --debug                       Print debug messages.\n"
             "  --status                      Show realtime resource usage status.\n"
+#endif
             "  --help                        Show this help.\n"
             "  --version                     Show version information.\n"
             "\n"
@@ -345,6 +347,7 @@ static void parse_options(int argc, char * argv[]) {
             print_help();
         } else if (option == "version") {
             print_version();
+#ifndef NDEBUG
         } else if (option == "debug") {
             DEBUG_ENABLED = 1;
             DEBUG_PID = 1;
@@ -353,6 +356,7 @@ static void parse_options(int argc, char * argv[]) {
             DEBUG_START_TIME = now();
         } else if (option == "status") {
             DEBUG_PROGRESS = 1;
+#endif
         } else if (option == "") {
             if (i + 1 >= argc) print_help();
             config.arg.args = argv + i + 1;
@@ -415,8 +419,6 @@ static void signal_handler(int signal) {
 
 
 int main(int argc, char * argv[]) {
-
-    DEBUG_ENABLED = (getenv("DEBUG") != 0);
 
     if (argc <= 1) print_help();
     parse_options(argc, argv);

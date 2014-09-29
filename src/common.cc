@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
+
+#ifndef NDEBUG
 int DEBUG_ENABLED = 0;
 int DEBUG_PID = 0;
 int DEBUG_TIMESTAMP = 0;
@@ -56,6 +58,7 @@ class DebugEnvDetector {
         return fallback;
     }
 } _debug_env_detect;
+#endif
 
 double now() {
     struct timeval t;
