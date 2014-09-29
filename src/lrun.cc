@@ -65,7 +65,7 @@ static void print_help() {
     fprintf(stderr,
             "Run program with resources limited.\n"
             "\n"
-            "Usage: lrun [ options ] command-args 3>stat\n"
+            "Usage: lrun [ options ] [ -- ] command-args [ 3>stat ]\n"
             "\n"
             "Options:\n"
             "  --max-cpu-time    seconds     Limit cpu time, seconds can be rational.\n"
@@ -92,7 +92,9 @@ static void print_help() {
             "  --nice            nice        Add nice with specified value.\n"
             "  --umask           int         Set umask.\n"
             "  --uid             uid         Set uid to specified uid (uid > 0).\n"
+            "                                Only root can set this.\n"
             "  --gid             gid         Set gid to specified gid (gid > 0).\n"
+            "                                Only root can set this.\n"
     );
     if (seccomp::supported()) {
         fprintf(stderr,
@@ -152,8 +154,7 @@ static void print_help() {
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
             "       --reset-env false --interval 0.05 --pass-exitcode false\\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
-            "       --max-rtprio 0 --nice 0\\\n"
-            "       --uid $UID --gid $GID\n"
+            "       --max-rtprio 0 --nice 0\n"
             "\n"
            );
     exit(0);
@@ -165,7 +166,7 @@ static void print_version() {
     exit(0);
 }
 
-static void parse_options(int argc, char * argv[]) {
+static void init_default_config() {
     // default settings
     config.cpu_time_limit = -1;
     config.real_time_limit = -1;
@@ -180,12 +181,11 @@ static void parse_options(int argc, char * argv[]) {
 
     // arg settings
     config.arg.nice = 0;
-    config.arg.uid = getuid() > 0 ? getuid() : (uid_t)2000;
-    config.arg.gid = getgid() > 0 ? getgid() : (gid_t)200;
+    config.arg.uid = getuid();
+    config.arg.gid = getgid();
     config.arg.umask = 022;
     config.arg.chroot_path = "";
     config.arg.chdir_path = "";
-    config.arg.args = argv + 1;
 
     // arg.rlimits settings
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
@@ -194,8 +194,11 @@ static void parse_options(int argc, char * argv[]) {
     config.arg.reset_env = 0;
     config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
     config.arg.syscall_list = "";
+}
 
-    // parse commandline options
+static void parse_cli_options(int argc, char * argv[]) {
+    config.arg.args = argv + 1;
+
 #define REQUIRE_NARGV(n) \
     if (i + n >= argc) { \
         fprintf(stderr, "Option '%s' requires %d argument%s.\n", option.c_str(), n, n > 1 ? "s" : ""); \
@@ -205,6 +208,13 @@ static void parse_options(int argc, char * argv[]) {
 #define NEXT_LONG_LONG_ARG (strconv::to_longlong(NEXT_STRING_ARG))
 #define NEXT_DOUBLE_ARG (strconv::to_double(NEXT_STRING_ARG))
 #define NEXT_BOOL_ARG (strconv::to_bool(NEXT_STRING_ARG))
+#define REQUIRE_ROOT \
+    { \
+        if (getuid() != 0) { \
+            fprintf(stderr, "Non-root users can not set '%s'.\n", option.c_str()); \
+            exit(1); \
+        } \
+    }
     for (int i = 1; i < argc; ++i) {
         // break if it is not option
         if (strncmp("--", argv[i], 2) != 0) {
@@ -276,13 +286,13 @@ static void parse_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             config.arg.umask = (mode_t)NEXT_LONG_LONG_ARG;
         } else if (option == "uid") {
+            REQUIRE_ROOT;
             REQUIRE_NARGV(1);
-            uid_t uid = (uid_t)NEXT_LONG_LONG_ARG;
-            if (uid != 0) config.arg.uid = uid;
+            config.arg.uid = (uid_t)NEXT_LONG_LONG_ARG;
         } else if (option == "gid") {
+            REQUIRE_ROOT;
             REQUIRE_NARGV(1);
-            gid_t gid = (gid_t)NEXT_LONG_LONG_ARG;
-            if (gid != 0) config.arg.gid = gid;
+            config.arg.gid = (gid_t)NEXT_LONG_LONG_ARG;
         } else if (option == "syscalls" && seccomp::supported()) {
             REQUIRE_NARGV(1);
             string syscalls = NEXT_STRING_ARG;
@@ -358,6 +368,7 @@ static void parse_options(int argc, char * argv[]) {
             DEBUG_PROGRESS = 1;
 #endif
         } else if (option == "") {
+            // meet --, expect commands
             if (i + 1 >= argc) print_help();
             config.arg.args = argv + i + 1;
             break;
@@ -367,10 +378,26 @@ static void parse_options(int argc, char * argv[]) {
         }
     }
 #undef REQUIRE_NARGV
+#undef REQUIRE_ROOT
 #undef NEXT_STRING_ARG
 #undef NEXT_LONG_LONG_ARG
 #undef NEXT_DOUBLE_ARG
 #undef NEXT_BOOL_ARG
+}
+
+static void check_config() {
+    if (config.arg.uid == 0) {
+        fprintf(stderr,
+                "For security reason, running commands with uid = 0 is not allowed.\n"
+                "Please specify a user ID using `--uid`.\n");
+        exit(1);
+    }
+    if (config.arg.gid == 0) {
+        fprintf(stderr,
+                "For security reason, running commands with gid = 0 is not allowed.\n"
+                "Please specify a group ID using `--gid`.\n");
+        exit(1);
+    }
 }
 
 static void check_environment() {
@@ -419,11 +446,14 @@ static void signal_handler(int signal) {
 
 
 int main(int argc, char * argv[]) {
-
     if (argc <= 1) print_help();
-    parse_options(argc, argv);
 
+    init_default_config();
+    parse_cli_options(argc, argv);
+
+    check_config();
     check_environment();
+
     INFO("pid = %d", (int)getpid());
 
     // pick an unique name and create a cgroup in filesystem

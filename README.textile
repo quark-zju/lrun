@@ -6,17 +6,21 @@ Run program on Linux with resources limited.
 
 h2. Dependencies
 
-h3. Running dependencies
+h3. Runtime dependencies
 
 * *linux*: (>= 2.6.26) you can check kernel config by @utils/check_linux_config.rb@.
 * *libseccomp*: (optionally, 1.x or 2.x) to enable syscall filtering feature.
 
-h3. Building dependencies
+h3. Build dependencies
 
 * *rake*: process Rakefile.
 * *g++*: g++ 4.6 and above recommended, 4.4 should work as well. Or clang++
 * *install*: install binaries.
 * *pkg-config*: get information about libseccomp.
+* *git*: get version information.
+
+h3. Installation dependencies
+
 * *groupadd*: create @lrun@ group.
 * *sudo*: (optionally) install via a non-root user.
 
@@ -31,10 +35,13 @@ rake install
 
 h4. User permissions
 
-@lrun@ requires @root@ permission. It can do very powerful/dangerous things.
+@lrun@ requires @root@ permission.
 
-Normal users should use @sudo@ to run lrun properly.
-If you want to run @lrun@ using a trusted non-root user without @sudo@, add that user to @lrun@ group.
+If you want to run @lrun@ using a trusted non-root user, add that user to @lrun@ group.
+Although the user cannot use `--uid` option in this setup, he or she may be able to
+use `--bindfs` to access sensitive information. Keep this in mind.
+
+Running @sudo lrun@ is dangerous because `--uid` option is available.
 
 h4. Building options
 
@@ -132,8 +139,10 @@ h3. Isolate processes
 
 h3. Change uid
 
+Note: starting from lrun 0.9.5, non-root users cannot set `--uid` and `--gid`.
+
 <pre>
-% lrun --uid 2000 /usr/bin/sudo ls
+% sudo lrun --uid 2000 --gid 200 /usr/bin/sudo ls
 sudo: unknown uid 2000: who are you?
 </pre>
 
