@@ -54,9 +54,10 @@ string fs::read(const string& path, size_t max_length) {
     FILE* fp = fopen(path.c_str(), "r");
     if (!fp) return "";
 
-    char buffer[max_length + 1];
+    size_t buffer_size = max_length + 1;
+    char buffer[buffer_size];
 
-    int nread = fread(buffer, 1, sizeof(buffer), fp);
+    int nread = fread(buffer, 1, buffer_size, fp);
     fclose(fp);
 
     buffer[max_length] = 0;
