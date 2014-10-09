@@ -386,6 +386,15 @@ int Cgroup::set_memory_limit(long long bytes) {
 
 // following functions are called by clone_fn
 
+__attribute__((unused)) static void do_set_sysctl() {
+    INFO("set sysctl settings");
+    // skip slow oom scaning and do not write syslog
+    fs::write("/proc/sys/vm/oom_kill_allocating_task", "1\n");
+    fs::write("/proc/sys/vm/oom_dump_tasks", "0\n");
+    // block dmesg access
+    fs::write("/proc/sys/kernel/dmesg_restrict", "1\n");
+}
+
 static void do_privatize_filesystem(const Cgroup::spawn_arg& arg) {
     // make sure filesystem not be shared
     // ignore this step for old systems without these features
@@ -427,6 +436,8 @@ static void do_mount_proc(const Cgroup::spawn_arg& arg) {
         if (mount(NULL, "/proc", "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
             FATAL("mount procfs failed");
         }
+        // hide sensitive directories
+        mount(NULL, "/proc/sys", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
     }
 }
 
@@ -593,6 +604,12 @@ static int clone_fn(void * clone_arg) {
     // fs and uid settings should be done here
     Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
 
+#ifdef SYSCTL_PER_NS_WORKS
+    // NOTE: Do not uncomment this until sysctl per namespace works.
+    // till 2014-10-09, setting vm.oom_kill_allocating_task, etc.
+    // still affect outer sysctl on Linux 3.16.3
+    do_set_sysctl();
+#endif
     do_close_high_fds(arg);
     do_privatize_filesystem(arg);
     do_mount_bindfs(arg);
