@@ -139,7 +139,7 @@ h3. Isolate processes
 
 h3. Change uid
 
-Note: starting from lrun 0.9.5, non-root users cannot set `--uid` and `--gid`.
+Note: starting from lrun 0.9.5, non-root users cannot set `--uid` and `--gid` and root must set `--uid` and `--gid`.
 
 <pre>
 % sudo lrun --uid 2000 --gid 200 /usr/bin/sudo ls
