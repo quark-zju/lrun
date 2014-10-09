@@ -64,16 +64,13 @@ string conv::from_double(double value, int precision) {
 }
 
 string conv::from_long(long value) {
-    char buf[32];
+    char buf[sizeof(long) * 3 + 1];
     snprintf(buf, sizeof buf, "%ld", value);
     return buf;
 }
 
 string conv::from_longlong(long long value) {
-    char buf[32];
+    char buf[sizeof(long long) * 3 + 1];
     snprintf(buf, sizeof buf, "%lld", value);
     return buf;
 }
-
-
-
