@@ -202,71 +202,89 @@ long long Cgroup::output_usage() const {
     return bytes;
 }
 
-int Cgroup::killall() {
+__attribute__((unused)) static char get_process_state(pid_t pid) {
+    FILE * fstatus = fopen((string(fs::PROC_PATH) + "/" + strconv::from_longlong(pid) + "/status").c_str(), "r");
+    char state = 0;
+    if (!fstatus) return 0;
+    fscanf(fstatus, "%*[^\n] State: %c", &state);
+    fclose(fstatus);
+    return state;
+}
+
+list<pid_t> Cgroup::get_pids() {
+    string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
+    FILE * procs = fopen(procs_path.c_str(), "r");
+    list<pid_t> pids;
+
+    if (procs) {
+        long pid;
+        while (fscanf(procs, "%ld", &pid) == 1) pids.push_back((pid_t)pid);
+        fclose(procs);
+    }
+    return pids;
+}
+
+static const int FREEZE_INCREASE_MEM_LIMIT_STEP = 8192;  // 8 K
+static const useconds_t FREEZE_KILL_WAIT_INTERVAL = 10000;  // 10 ms
+static const int FREEZE_ATTEMPTS_BEFORE_ENABLE_OOM = 16;
+
+void Cgroup::freeze(int freeze) {
+    if (!valid()) return;
+    string freeze_state_path = subsys_path(CG_FREEZER) + "/freezer.state";
+
+    if (!freeze) {
+        INFO("unfreeze");
+        fs::write(freeze_state_path, "THAWED\n");
+        return;
+    } else {
+        INFO("freezing");
+        fs::write(freeze_state_path, "FROZEN\n");
+
+        for (int loop = 0, mem_limit_inc = 0;; ++loop) {
+            int frozen = (strncmp(fs::read(freeze_state_path, 4).c_str(), "FRO", 3) == 0);
+            if (frozen) break;
+
+            if (mem_limit_inc < FREEZE_ATTEMPTS_BEFORE_ENABLE_OOM && mem_limit_inc >= 0) {
+                INFO("increase memory limit by %d to \"help\" freezer", FREEZE_INCREASE_MEM_LIMIT_STEP);
+                set_memory_limit(memory_peak() + FREEZE_INCREASE_MEM_LIMIT_STEP);
+                ++mem_limit_inc;
+            } else if (mem_limit_inc >= 0)  {
+                INFO("enable OOM killer");
+                set_memory_limit(1);
+                if (set(CG_MEMORY, "memory.oom_control", "0\n") == 0) mem_limit_inc = -1;
+            }
+
+            usleep(FREEZE_KILL_WAIT_INTERVAL);
+        }
+        INFO("confirmed frozen");
+    }
+}
+
+void Cgroup::killall() {
 
     // return immediately if cgroup is not valid
-    if (!valid()) return -1;
+    if (!valid()) return;
 
     // kill all processes
     string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
-    string freeze_state_path = subsys_path(CG_FREEZER) + "/freezer.state";
 
     // check procs_path first, return if empty
-    if (fs::read(procs_path, 4).empty()) return 0;
+    if (fs::read(procs_path, 4).empty()) return;
 
-    PROGRESS_INFO("KILLING: STARTED");
-
-    int nkill = 0, frozen = 0;
-    for (int loop = 0; !frozen;) {
-        // Freeze cgroup before send killing signals
-        fs::write(freeze_state_path, "FROZEN\n");
-
-        frozen = (strncmp(fs::read(freeze_state_path, 4).c_str(), "FRO", 3) == 0);
-
-        // When OOM killer is disabled, processes may enter D status,
-        // which prevents freezer freeze whole group,
-        // OOM killer should be enabled to reach FROZEN status
-        if (loop == 0) {
-            PROGRESS_INFO("KILLING: ENABLING OOM");
-            set_memory_limit(1);
-            if (set(CG_MEMORY, "memory.oom_control", "0\n") == 0) ++loop;
-        } else ++loop;
-
-        // open cgroup.procs and read process ids
-        PROGRESS_INFO("KILLING: LOOP %d - READING", loop);
-        FILE * procs = fopen(procs_path.c_str(), "r");
-        if (!procs) {
-            frozen = 0;
-            continue;
-        }
-
-        long pid;
-        list<pid_t> pids;
-        while (fscanf(procs, "%ld", &pid) == 1) pids.push_back((pid_t)pid);
-        fclose(procs);
-
-        PROGRESS_INFO("KILLING: LOOP %d - SIGNALING", loop);
-
-        // kill pids
-        FOR_EACH(p, pids) kill(p, SIGKILL);
-
-        // count into nkill, nkill should not overflow
-        if (nkill < (int)pids.size()) nkill = pids.size();
-    }
-
-    PROGRESS_INFO("\nKILLING: FROZEN, WAITING, NKILL = %d\n", nkill);
-
-    // unfreeze and wait all processes gone
-    // processes receive signals when they are alive
-    fs::write(freeze_state_path, "THAWED\n");
+    freeze(1);
+    list<pid_t> pids = get_pids();
+    FOR_EACH(p, pids) kill(p, SIGKILL);
+    INFO("sent SIGKILLs");
 
     // give processes sometime to disappear
+    freeze(0);
     for (int clear = 0; clear == 0;) {
         if (fs::read(procs_path, 4).empty()) break;
-        usleep(6);
+        usleep(FREEZE_KILL_WAIT_INTERVAL);
     }
+    INFO("confirmed processes are killed");
 
-    return nkill;
+    return;
 }
 
 int Cgroup::destroy() {

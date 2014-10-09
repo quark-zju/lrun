@@ -100,7 +100,7 @@ namespace lrun {
             // Cgroup low level methods
 
             /**
-             * killall processes and destroy this cgroup
+             * kill all processes and destroy this cgroup
              * @return 0            success
              *         other        failed
              */
@@ -158,15 +158,30 @@ namespace lrun {
              */
             long long output_usage() const;
 
+            /**
+             * get pid list
+             * @return  pids       a list of pids in the cgroup
+             */
+            std::list<pid_t> get_pids();
+
             // Cgroup high level methods
 
             /**
-             * kill all tasks until no more tasks
-             * @return -1           error
-             *          0           no tasks running
-             *         >0           number of tasks killed
+             * kill all tasks until no more tasks alive.
+             * the method will block until all tasks are confirmed gone.
              */
-            int killall();
+            void killall();
+
+            /**
+             * use freezer cgroup subsystem to freeze processes
+             * if freeze is non-zero, the method will block until
+             * all processes are frozen.
+             * freezer may attempt increase memory limit and
+             * enable oom to get rid of D state processes.
+             *
+             * @param   freeze     0: unfreeze. other: freeze
+             */
+            void freeze(int freeze = 1);
 
             /**
              * get current memory usage

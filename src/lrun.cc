@@ -429,7 +429,7 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
     if (config.cgname.empty()) {
         if (cg.destroy()) WARNING("can not destroy cgroup");
     } else {
-        if (cg.killall() < 0) WARNING("can not kill all processes in cgroup");
+        cg.killall();
     }
 
     exit(exit_code);
@@ -488,9 +488,11 @@ int main(int argc, char * argv[]) {
     // some cgroup options, fail quietly
     cg.set(Cgroup::CG_MEMORY, "memory.swappiness", "0\n");
 
-    // enable oom killer now, otherwise child may enter D status before exec
-    // old memory cgroup subsystem does not know this, ignore silently
-    cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "0\n");
+    // disable oom killer because it will make dmesg noisy.
+    // note: this may cause the child process freeze (D state) before execve,
+    // we have MIN_MEMORY_LIMIT so it probably won't happen.
+    // old memory cgroup subsystem does not know this, ignore silently.
+    cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "1\n");
 
     // other cgroup options
     FOR_EACH(p, config.cgroup_options) {
@@ -502,10 +504,7 @@ int main(int argc, char * argv[]) {
 
     // reset cpu / memory usage and killall existing processes
     // not needed if cg can be guarnteed that is newly created
-    if (cg.killall()) {
-        ERROR("can not stop running processes in group.");
-        clean_cg_exit(cg, 3);
-    }
+    cg.killall();
 
     if (cg.reset_usages()) {
         ERROR("can not reset cpu time / memory usage counter.");
