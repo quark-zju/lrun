@@ -152,7 +152,7 @@ static void print_help() {
             "\n"
             "Default options:\n"
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
-            "       --reset-env false --interval 0.05 --pass-exitcode false\\\n"
+            "       --reset-env false --interval 0.02 --pass-exitcode false\\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
             "       --max-rtprio 0 --nice 0\n"
             "\n"
@@ -175,7 +175,7 @@ static void init_default_config() {
     config.enable_devices_whitelist = false;
     config.enable_network = true;
     config.enable_user_proc_namespace = true;
-    config.interval = (useconds_t)(0.05 * 1000000);
+    config.interval = (useconds_t)(0.02 * 1000000);
     config.active_cgroup = NULL;
     config.pass_exitcode = false;
 
