@@ -436,10 +436,9 @@ static void do_mount_proc(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
-    // close fds other than 0,1,2 and sockets[0]
-    INFO("close high fds");
-    close(arg.sockets[1]);
+static list<int> get_fds() {
+    list<int> fds;
+
     struct dirent **namelist = 0;
     int nlist = scandir("/proc/self/fd", &namelist, 0, alphasort);
     for (int i = 0; i < nlist; ++i) {
@@ -447,13 +446,26 @@ static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
         // skip . and ..
         if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
             int fd;
-            if (sscanf(name, "%d", &fd) == 1 && fd > 2 && fd != arg.sockets[0] && arg.keep_fds.count(fd) == 0) {
-                close(fd);
-            }
+            if (sscanf(name, "%d", &fd) != 1) continue;
+            fds.push_back(fd);
         }
         free(namelist[i]);
     }
     if (namelist) free(namelist);
+
+    return fds;
+}
+
+static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
+    // close fds other than 0,1,2 and sockets[0]
+    INFO("close high fds");
+    close(arg.sockets[1]);
+    list<int> fds = get_fds();
+    FOR_EACH(fd, fds) {
+        if (fd > 2 && fd != arg.sockets[0] && arg.keep_fds.count(fd) == 0) {
+            close(fd);
+        }
+    }
 }
 
 static void do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
