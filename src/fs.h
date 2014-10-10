@@ -151,6 +151,14 @@ namespace lrun {
          *         -1           fail
          */
         int umount(const std::string& dest, bool lazy = true);
+
+        class ScopedFileLock {
+            public:
+                ScopedFileLock(const char path[]);
+                ~ScopedFileLock();
+            private:
+                int fd_;
+        };
     }
 }
 

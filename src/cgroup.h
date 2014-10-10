@@ -95,7 +95,7 @@ namespace lrun {
              * @param   subsys_id   cgroup subsystem id
              * @return  full path
              */
-            std::string subsys_path(subsys_id_t subsys_id) const;
+            std::string subsys_path(subsys_id_t subsys_id = CG_CPUACCT) const;
 
             // Cgroup low level methods
 

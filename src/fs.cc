@@ -25,12 +25,13 @@
 #include <cstring>
 #include <cstdlib>
 #include <cerrno>
-#include <unistd.h>
 #include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <sys/types.h>
-#include <dirent.h>
+#include <sys/file.h>
 
 namespace fs = lrun::fs;
 using std::string;
@@ -156,4 +157,22 @@ int fs::umount(const string& dest, bool lazy) {
     } else {
         return umount(dest.c_str());
     }
+}
+
+fs::ScopedFileLock::ScopedFileLock(const char path[]) {
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return;
+    if (flock(fd, LOCK_EX) == 0) {
+        this->fd_ = fd;
+    } else {
+        close(fd);
+        this->fd_ = -1;
+    }
+}
+
+fs::ScopedFileLock::~ScopedFileLock() {
+    int fd = this->fd_;
+    if (fd < 0) return;
+    flock(fd, LOCK_UN);
+    close(fd);
 }

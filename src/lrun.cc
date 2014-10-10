@@ -740,6 +740,8 @@ int main(int argc, char * argv[]) {
 
     {
         Cgroup& cg = *config.active_cgroup;
+        // lock the cgroup so other lrun process with same cgname will wait
+        fs::ScopedFileLock cg_lock(cg.subsys_path().c_str());
         setup_cgroup();
         int ret = run_command();
         clean_cg_exit(cg, ret);
