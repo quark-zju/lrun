@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <cmath>
 #include <vector>
 #include <string>
 #include <unistd.h>
@@ -203,6 +204,7 @@ static void init_default_config() {
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
     config.arg.rlimits[RLIMIT_NPROC] = 2048;
     config.arg.rlimits[RLIMIT_RTPRIO] = 0;
+    config.arg.rlimits[RLIMIT_CORE] = 0;
     config.arg.reset_env = 0;
     config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
     config.arg.syscall_list = "";
@@ -254,6 +256,7 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "max-output") {
             REQUIRE_NARGV(1);
             config.output_limit = NEXT_LONG_LONG_ARG;
+            config.arg.rlimits[RLIMIT_FSIZE] = config.output_limit;
         } else if (option == "max-nprocess") {
             REQUIRE_NARGV(1);
             config.arg.rlimits[RLIMIT_NPROC] = NEXT_LONG_LONG_ARG;
@@ -539,6 +542,11 @@ int main(int argc, char * argv[]) {
         clean_cg_exit(cg, 4);
     }
 
+    // rlimit time
+    if (config.cpu_time_limit > 0) {
+        config.arg.rlimits[RLIMIT_CPU] = (int)(ceil(config.cpu_time_limit));
+    }
+
     // fd 3 should not be inherited by child process
     if (fcntl(3, F_SETFD, FD_CLOEXEC)) {
         // ignore bad fd error
@@ -546,11 +554,6 @@ int main(int argc, char * argv[]) {
             ERROR("can not set FD_CLOEXEC on fd 3");
             clean_cg_exit(cg, 5);
         }
-    }
-
-    // rlimit time
-    if (config.cpu_time_limit > 0) {
-        config.arg.rlimits[RLIMIT_CPU] = (int)(config.cpu_time_limit);
     }
 
     // spawn child
@@ -677,6 +680,10 @@ int main(int argc, char * argv[]) {
     if ((WIFSIGNALED(stat) && WTERMSIG(stat) == SIGXCPU) || (config.cpu_time_limit > 0 && cpu_time_usage >= config.cpu_time_limit)) {
         cpu_time_usage = config.cpu_time_limit;
         exceeded_limit = "CPU_TIME";
+    }
+
+    if (WIFSIGNALED(stat) && WTERMSIG(stat) == SIGXFSZ) {
+        exceeded_limit = "OUTPUT";
     }
 
     double real_time_usage = now() - start_time;

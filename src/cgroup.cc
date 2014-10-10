@@ -533,12 +533,15 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
         int resource = p.first;
         if (resource >= RLIMIT_NLIMITS) continue;
 
-        rlimit limit, current;
+        rlimit limit;
         limit.rlim_cur = limit.rlim_max = p.second;
 
-        // wish to receive SIGXCPU to know it is TLE
-        if (resource == RLIMIT_CPU) ++limit.rlim_max;
-        getrlimit(resource, &current);
+        // wish to receive SIGXCPU or SIGXFSZ to know it is TLE or OLE.
+        // NOTE: if pid namespace is used (--isolate-process true), pid 1
+        // in the new pid ns is immune to signals (including SIGKILL) by
+        // default! This means that rlimit won't work for it. Therefore,
+        // a dummy init process is created if possible.
+        if (resource == RLIMIT_CPU || resource == RLIMIT_FSIZE) ++limit.rlim_max;
 
         DEBUG_DO {
             char limit_name[16];
@@ -564,6 +567,8 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
                 default:
                     snprintf(limit_name, sizeof(limit_name), "0x%x", resource);
             }
+            rlimit current;
+            getrlimit(resource, &current);
             INFO("setrlimit %s, cur: %d => %d, max: %d => %d", limit_name,
                  (int)current.rlim_cur, (int)limit.rlim_cur,
                  (int)current.rlim_max, (int)limit.rlim_max);
