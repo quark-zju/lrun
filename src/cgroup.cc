@@ -202,15 +202,6 @@ long long Cgroup::output_usage() const {
     return bytes;
 }
 
-__attribute__((unused)) static char get_process_state(pid_t pid) {
-    FILE * fstatus = fopen((string(fs::PROC_PATH) + "/" + strconv::from_longlong(pid) + "/status").c_str(), "r");
-    char state = 0;
-    if (!fstatus) return 0;
-    fscanf(fstatus, "%*[^\n] State: %c", &state);
-    fclose(fstatus);
-    return state;
-}
-
 list<pid_t> Cgroup::get_pids() {
     string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
     FILE * procs = fopen(procs_path.c_str(), "r");

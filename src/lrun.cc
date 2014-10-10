@@ -450,6 +450,15 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
     exit(exit_code);
 }
 
+static char get_process_state(pid_t pid) {
+    FILE * fstatus = fopen((string(fs::PROC_PATH) + "/" + strconv::from_longlong(pid) + "/status").c_str(), "r");
+    char state = 0;
+    if (!fstatus) return 0;
+    fscanf(fstatus, "%*[^\n] State: %c", &state);
+    fclose(fstatus);
+    return state;
+}
+
 static void signal_handler(int signal) {
     signal_triggered = signal;
 }
@@ -635,9 +644,8 @@ int main(int argc, char * argv[]) {
 
         // in case SIGCHILD is unreliable
         // check zombie manually here instead of waiting SIGCHILD
-        string child_proc_stat = fs::read("/proc/" + strconv::from_long((long)pid) + "/stat", 128);
-        if (child_proc_stat.find(" Z ") != string::npos) {
-            // a zombie !
+        if (get_process_state(pid) == 'Z') {
+            INFO("child becomes zombie");
             running = false;
             // check waitpid again
             e = waitpid(pid, &stat, WNOHANG);
