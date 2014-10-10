@@ -21,8 +21,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "common.h"
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
+#include <unistd.h>
 #include <sys/time.h>
+#include <sys/file.h>
 
 
 #ifndef NDEBUG
@@ -31,6 +34,37 @@ int DEBUG_PID = 0;
 int DEBUG_TIMESTAMP = 0;
 int DEBUG_PROGRESS = 0;
 double DEBUG_START_TIME = 0;
+
+
+static char log_lock_path[80];
+
+static char* get_log_lock_path() {
+    if (!log_lock_path[0]) {
+        // create lock file
+        snprintf(log_lock_path, sizeof log_lock_path, "/tmp/.%d-log.lock", (int)getpid());
+        int fd = open(log_lock_path, O_CREAT | O_TRUNC | O_WRONLY, 0444);
+        if (fd != -1) close(fd);
+    }
+    return log_lock_path;
+}
+
+ScopedLogLock::ScopedLogLock() {
+    this->fd_ = -1;
+    int fd = open(get_log_lock_path(), O_RDONLY);
+    if (fd < 0) return;
+    if (flock(fd, LOCK_EX) == 0) {
+        this->fd_ = fd;
+    } else {
+        close(fd);
+    }
+}
+
+ScopedLogLock::~ScopedLogLock() {
+    int fd = this->fd_;
+    if (fd < 0) return;
+    flock(fd, LOCK_UN);
+    close(fd);
+}
 
 class DebugEnvDetector {
     public:
@@ -44,6 +78,10 @@ class DebugEnvDetector {
         } else {
             ::DEBUG_PROGRESS = readEnvBool("DEBUG_PROGRESS", 0);
         }
+    }
+
+    ~DebugEnvDetector() {
+        if (log_lock_path[0]) unlink(log_lock_path);
     }
 
     static int readEnvBool(const char * const name, int fallback = 1) {
@@ -65,4 +103,3 @@ double now() {
     gettimeofday(&t, 0);
     return t.tv_usec / 1e6 + t.tv_sec;
 }
-

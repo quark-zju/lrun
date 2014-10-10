@@ -57,12 +57,20 @@ extern double now();
 # define INFO(...) ;
 # define PROGRESS_INFO(...) ;
 # define DEBUG_DO if (0)
+# define SCOPED_LOG_LOCK ;
 #else
 extern int DEBUG_ENABLED;
 extern double DEBUG_START_TIME;
 extern int DEBUG_TIMESTAMP;
 extern int DEBUG_PROGRESS;
 extern int DEBUG_PID;
+struct ScopedLogLock {
+    ScopedLogLock();
+    ~ScopedLogLock();
+    int fd_;
+};
+
+# define SCOPED_LOG_LOCK ScopedLogLock lock;
 # define SHOW_SOURCE_LOCATION \
     if (DEBUG_ENABLED) fprintf(stderr, "  at %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 # define PRINT_TIMESTAMP \
@@ -72,7 +80,7 @@ extern int DEBUG_PID;
     }
 # define INFO(...) \
     if (__builtin_expect(DEBUG_ENABLED, 0)) { \
-        fflush(stderr); \
+        ScopedLogLock lock;\
         PRINT_TIMESTAMP; \
         fprintf(stderr, "INFO: "); \
         fprintf(stderr, __VA_ARGS__); \
@@ -81,7 +89,7 @@ extern int DEBUG_PID;
     }
 # define PROGRESS_INFO(...) \
     if (__builtin_expect(DEBUG_PROGRESS, 0)) { \
-        fflush(stderr); \
+        SCOPED_LOG_LOCK; \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "        \r"); \
         fflush(stderr); \
@@ -94,38 +102,38 @@ extern int DEBUG_PID;
 #define TIMESTAMP (now() - DEBUG_START_TIME)
 
 #define FATAL(...) \
-    {   \
-        fflush(stderr); \
+    { \
+        SCOPED_LOG_LOCK; \
         PRINT_TIMESTAMP; \
         fprintf(stderr, "FATAL: "); \
         fprintf(stderr, __VA_ARGS__); \
         if (errno) fprintf(stderr, " (%s)", strerror(errno)); \
         fprintf(stderr, "\n"); \
-        SHOW_SOURCE_LOCATION \
+        SHOW_SOURCE_LOCATION; \
         fflush(stderr); \
         exit(-1); \
     }
 
 #define ERROR(...) \
     { \
-        fflush(stderr); \
+        SCOPED_LOG_LOCK; \
         PRINT_TIMESTAMP; \
         fprintf(stderr, "ERROR: "); \
         fprintf(stderr, __VA_ARGS__); \
         if (errno) fprintf(stderr, " (%s)", strerror(errno)); \
         fprintf(stderr, "\n"); \
-        SHOW_SOURCE_LOCATION \
+        SHOW_SOURCE_LOCATION; \
         fflush(stderr); \
     }
 
 #define WARNING(...) \
     { \
-        fflush(stderr); \
+        SCOPED_LOG_LOCK; \
         PRINT_TIMESTAMP; \
         fprintf(stderr, "WARNING: "); \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n"); \
-        SHOW_SOURCE_LOCATION \
+        SHOW_SOURCE_LOCATION; \
         fflush(stderr); \
     }
 
