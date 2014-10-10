@@ -86,7 +86,7 @@ string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
         mounts[string(ent->mnt_dir)] = string(ent->mnt_type);
         if (strcmp(ent->mnt_type, fs::TYPE_CGROUP)) continue;
         if (strstr(ent->mnt_opts, subsys_name)) {
-            INFO("found cgroup %s path = '%s'", subsys_name, ent->mnt_dir);
+            INFO("cgroup %s path = '%s'", subsys_name, ent->mnt_dir);
             return (subsys_base_paths_[subsys_id] = string(ent->mnt_dir));
         }
     }
@@ -157,11 +157,9 @@ Cgroup Cgroup::create(const string& name) {
         string path = path_from_name((subsys_id_t)id, name);
         if (fs::is_dir(path)) continue;
         if (mkdir(path.c_str(), 0700)) {
-            INFO("mkdir '%s': failed, %s", path.c_str(), strerror(errno));
+            ERROR("mkdir '%s': failed", path.c_str());
             success = 0;
             break;
-        } else {
-            INFO("mkdir '%s': ok", path.c_str());
         }
     }
 
@@ -678,8 +676,8 @@ static int clone_main_fn(void * clone_arg) {
 
 #ifdef SYSCTL_PER_NS_WORKS
     // NOTE: Do not uncomment this until sysctl per namespace works.
-    // till 2014-10-09, setting vm.oom_kill_allocating_task, etc.
-    // still affect outer sysctl on Linux 3.16.3
+    // current kernel use global variables for vm.oom_kill_allocating_task,
+    // etc.
     do_set_sysctl();
 #endif
     do_close_high_fds(arg);

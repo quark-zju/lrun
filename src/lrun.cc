@@ -149,9 +149,9 @@ static void print_help() {
             "  No matter what order of options are, lrun process options in following\n"
             "  order:\n"
             "\n"
-            "    --bindfs, --chroot, --fd, --tmpfs, --chdir, --cmd, --umask,\n"
-            "    --gid, --uid, (rlimit options), --env, --nice, (cgroup limits),\n"
-            "    --syscalls\n"
+            "    --fd, --bindfs, --chroot, (mount /proc), --tmpfs, --chdir, --cmd,\n"
+            "    --umask, --gid, --uid, (rlimit options), --env, --nice,\n"
+            "    (cgroup limits), --syscalls\n"
             "\n"
             "Default options:\n"
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
@@ -581,6 +581,8 @@ static int run_command() {
     setup_signal_handlers();
     if (nice(-5) == -1) ERROR("can not renice");
 
+    INFO("entering main loop, watching pid %d", (int)pid);
+
     // monitor its cpu_usage and real time usage and memory usage
     double start_time = now();
     double deadline = config.real_time_limit > 0 ? start_time + config.real_time_limit : -1;
@@ -605,6 +607,7 @@ static int run_command() {
         if (e == pid) {
             // stat available
             if (WIFEXITED(stat) || WIFSIGNALED(stat)) {
+                INFO("child exited");
                 running = false;
                 break;
             }
