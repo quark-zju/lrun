@@ -25,15 +25,19 @@
 #include "strconv.h"
 #include <cstdio>
 #include <cstring>
-#include <mntent.h>
-#include <sys/stat.h>
-#include <sys/mount.h>
-#include <sys/socket.h>
-#include <signal.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
 #include <list>
+#include <dirent.h>
+#include <fcntl.h>
+#include <mntent.h>
+#include <sched.h>
+#include <signal.h>
+#include <sys/mount.h>
+#include <sys/prctl.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 
 using namespace lrun;
@@ -162,6 +166,7 @@ Cgroup Cgroup::create(const string& name) {
     }
 
     if (success) cg.name_ = name;
+    cg.init_pid_ = 0;
 
     return cg;
 }
@@ -260,23 +265,34 @@ void Cgroup::killall() {
     // return immediately if cgroup is not valid
     if (!valid()) return;
 
-    // kill all processes
-    string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
-
     // check procs_path first, return if empty
-    if (fs::read(procs_path, 4).empty()) return;
+    if (empty()) return;
 
-    freeze(1);
-    list<pid_t> pids = get_pids();
-    FOR_EACH(p, pids) kill(p, SIGKILL);
-    INFO("sent SIGKILLs");
+    if (init_pid_) {
+        // if init pid exists, just kill it and the kernel will kill all
+        // remaining processes in the same pid ns.
+        // because our init process (clone_init_fn) won't allocate memory,
+        // it will not enter D state and is safe to kill.
+        kill(init_pid_, SIGKILL);
+        // cancel memory limit. this will wake up some D state processes,
+        // which are allocating memory and reached memory limit.
+        set_memory_limit(-1);
+        INFO("sent SIGKILL to init process %d", (int)init_pid_);
+        init_pid_ = 0;
+    } else {
+        freeze(1);
+        list<pid_t> pids = get_pids();
+        FOR_EACH(p, pids) kill(p, SIGKILL);
+        INFO("sent SIGKILLs to %d processes", (int)pids.size());
+        freeze(0);
+    }
 
-    // give processes sometime to disappear
-    freeze(0);
+    // wait and verify that processes are gone
     for (int clear = 0; clear == 0;) {
-        if (fs::read(procs_path, 4).empty()) break;
+        if (empty()) break;
         usleep(FREEZE_KILL_WAIT_INTERVAL);
     }
+
     INFO("confirmed processes are killed");
 
     return;
@@ -379,7 +395,7 @@ int Cgroup::set_memory_limit(long long bytes) {
     return e ? -1 : 0;
 }
 
-// following functions are called by clone_fn
+// following functions are called by clone_main_fn
 
 __attribute__((unused)) static void do_set_sysctl() {
     INFO("set sysctl settings");
@@ -432,6 +448,9 @@ static void do_mount_proc(const Cgroup::spawn_arg& arg) {
             FATAL("mount procfs failed");
         }
         // hide sensitive directories
+        if ((arg.clone_flags & CLONE_NEWPID) && getpid() != 1) {
+            mount(NULL, "/proc/1", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+        }
         mount(NULL, "/proc/sys", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
     }
 }
@@ -610,7 +629,48 @@ static void do_seccomp(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static int clone_fn(void * clone_arg) {
+static void init_signal_handler(int signal) {
+    if (signal == SIGCHLD) {
+        int status;
+        while (waitpid(-1, &status, WNOHANG) > 0);
+    } else {
+        exit(1);
+    }
+}
+
+static int clone_init_fn(void *) {
+    // a dummy init process in new pid namespace
+    // intended to be killed via SIGKILL from root pid namespace
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+
+    {
+        struct sigaction action;
+        action.sa_handler = init_signal_handler;
+        sigemptyset(&action.sa_mask);
+        action.sa_flags = 0;
+        sigaction(SIGKILL, &action, NULL);
+        sigaction(SIGHUP, &action, NULL);
+        sigaction(SIGINT, &action, NULL);
+        sigaction(SIGTERM, &action, NULL);
+        sigaction(SIGABRT, &action, NULL);
+        sigaction(SIGQUIT, &action, NULL);
+        sigaction(SIGPIPE, &action, NULL);
+        sigaction(SIGALRM, &action, NULL);
+        sigaction(SIGCHLD, &action, NULL);
+    }
+
+    // close all fds
+    {
+        list<int> fds = get_fds();
+        INFO("init is running");
+        FOR_EACH(fd, fds) close(fd);
+    }
+
+    while (1) pause();
+    return 0;
+}
+
+static int clone_main_fn(void * clone_arg) {
 
     // this is executed in child process after clone
     // fs and uid settings should be done here
@@ -675,7 +735,15 @@ static int clone_fn(void * clone_arg) {
     (void)ret;
 
     return -1;
-} // clone_fn
+} // clone_main_fn
+
+static int is_setns_pidns_supported() {
+    string pidns_path = string(fs::PROC_PATH) + "/self/ns/pid";
+    int fd = open(pidns_path.c_str(), O_RDONLY);
+    if (fd == -1) return 0;
+    close(fd);
+    return 1;
+}
 
 static string clone_flags_to_str(int clone_flags) {
     int v = clone_flags;
@@ -755,6 +823,54 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         return -2;
     }
 
+    // stack size for cloned processes
+    long stack_size = sysconf(_SC_PAGESIZE);
+    static const long MIN_STACK_SIZE = 8192;
+    if (stack_size < MIN_STACK_SIZE) stack_size = MIN_STACK_SIZE;
+
+    // We need root permissions and drop root later, no CLONE_NEWUSER here
+    // CLONE_NEWNS is required for private mounts
+    // CLONE_NEWUSER is not used because new uid 0 may be non-root
+    int clone_flags = CLONE_NEWNS | SIGCHLD | arg.clone_flags;
+
+    // older kernel (ex. Debian 7, 3.2.0) doesn't support setns(whatever, CLONE_PIDNS)
+    // just do not create init process in that case.
+    if (is_setns_pidns_supported() && (clone_flags & CLONE_NEWPID) == CLONE_NEWPID) {
+        // create a dummy init process in a new namespace
+        // CLONE_PTRACE: prevent the process being traced by another process
+        INFO("spawning dummy init process");
+        int init_clone_flags = CLONE_NEWPID | CLONE_PTRACE;
+        init_pid_ = clone(clone_init_fn, (void*)((char*)alloca(stack_size) + stack_size), init_clone_flags, &arg);
+        if (init_pid_ < 0) {
+            ERROR("can not spawn init process");
+            return -3;
+        }
+
+        // switch to that pid namespace for our next clone
+        string pidns_path = string(fs::PROC_PATH) + "/" + strconv::from_long(long(init_pid_)) + "/ns/pid";
+        INFO("set pid ns to the same as %s", pidns_path.c_str());
+        int pidns_fd = open(pidns_path.c_str(), O_RDONLY);
+        if (pidns_fd < 0) {
+            ERROR("can not open pid namespace");
+            system("bash");
+            return -3;
+        }
+
+        // older glibc does not have setns
+        if (syscall(SYS_setns, pidns_fd, CLONE_NEWPID)) {
+            ERROR("can not set pid namespace");
+            return -3;
+        };
+        close(pidns_fd);
+
+        // remove CLONE_NEWPID flag because setns() will affect all new processes
+        clone_flags ^= CLONE_NEWPID;
+    } // spawn init process
+
+    DEBUG_DO {
+        INFO("clone flags = 0x%x = %s", (int)clone_flags, clone_flags_to_str(clone_flags).c_str());
+    }
+
     // do sync use socket pair
     if (socketpair(AF_LOCAL, SOCK_STREAM, 0, arg.sockets)) {
         ERROR("socketpair failed");
@@ -765,21 +881,9 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     fcntl(arg.sockets[0], F_SETFD, FD_CLOEXEC);
     fcntl(arg.sockets[1], F_SETFD, FD_CLOEXEC);
 
-    // We need root permissions and drop root later, no CLONE_NEWUSER here
-    // CLONE_NEWNS is required for private mounts
-    // CLONE_NEWUSER is not used because new uid 0 may be non-root
-    int clone_flags = CLONE_NEWNS | SIGCHLD | arg.clone_flags;
-
-    long stack_size = sysconf(_SC_PAGESIZE);
-    void * stack = (void*)((char*)alloca(stack_size) + stack_size);
-    char buf[] = "RUN";
-
-    DEBUG_DO {
-        INFO("clone flags = 0x%x = %s", (int)clone_flags, clone_flags_to_str(clone_flags).c_str());
-    }
-
     pid_t child_pid;
-    child_pid = clone(clone_fn, stack, clone_flags, &arg);
+    child_pid = clone(clone_main_fn, (void*)((char*)alloca(stack_size) + stack_size), clone_flags, &arg);
+    char buf[4];
 
     if (child_pid < 0) {
         FATAL("clone failed");
@@ -793,15 +897,14 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     attach(child_pid);
 
     // child is blocking, waiting us before exec, let it go
+    strcpy(buf, "RUN");
     close(arg.sockets[0]);
     send(arg.sockets[1], buf, sizeof buf, MSG_NOSIGNAL);
 
     // wait for child response
     INFO("reading from child");
 
-    int ret;
-    ret = read(arg.sockets[1], buf, sizeof buf);
-    (void)ret;
+    read(arg.sockets[1], buf, sizeof buf);
 
     INFO("from child, got '%3s'", buf);
     if (buf[0] != 'P') {

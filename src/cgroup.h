@@ -146,11 +146,11 @@ namespace lrun {
              */
             bool valid() const;
 
+
             /**
              * scan group processes and update output usage
              */
             void update_output_count();
-
 
             /**
              * return output usage
@@ -290,12 +290,15 @@ namespace lrun {
              */
             std::map<long, long long> output_counter_;
 
+            /**
+             * cached init pid (only valid if pid namespace is enabled)
+             */
+            pid_t init_pid_;
 
             /**
              * cached paths
              */
             static std::string subsys_base_paths_[SUBSYS_COUNT];
-
     };
 }
 
