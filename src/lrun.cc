@@ -485,27 +485,21 @@ static void setup_signal_handlers() {
     sigaction(SIGTRAP, &action, NULL);
 }
 
-int main(int argc, char * argv[]) {
-    if (argc <= 1) print_help();
-
-    init_default_config();
-    parse_cli_options(argc, argv);
-
-    check_config();
-    check_environment();
-
-    INFO("pid = %d", (int)getpid());
-
+static void create_cgroup() {
     // pick an unique name and create a cgroup in filesystem
     string cgname = config.cgname;
     if (cgname.empty()) cgname = "lrun" + strconv::from_long((long)getpid());
     INFO("cgname = '%s'", cgname.c_str());
 
     // create or reuse group
-    Cgroup cg = Cgroup::create(cgname);
+    static Cgroup new_cg = Cgroup::create(cgname);
 
-    if (!cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
-    config.active_cgroup = &cg;
+    if (!new_cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
+    config.active_cgroup = &new_cg;
+}
+
+static void setup_cgroup() {
+    Cgroup& cg = *config.active_cgroup;
 
     // assume cg is created just now and nobody has used it before.
     // initialize settings
@@ -553,6 +547,10 @@ int main(int argc, char * argv[]) {
     if (config.cpu_time_limit > 0) {
         config.arg.rlimits[RLIMIT_CPU] = (int)(ceil(config.cpu_time_limit));
     }
+}
+
+static int run_command() {
+    Cgroup& cg = *config.active_cgroup;
 
     // fd 3 should not be inherited by child process
     if (fcntl(3, F_SETFD, FD_CLOEXEC)) {
@@ -571,7 +569,6 @@ int main(int argc, char * argv[]) {
     if (!config.enable_network) clone_flags |= CLONE_NEWNET;
     if (config.enable_user_proc_namespace) clone_flags |= CLONE_NEWPID | CLONE_NEWIPC;
     config.arg.clone_flags = clone_flags;
-
 
     pid = cg.spawn(config.arg);
 
@@ -720,15 +717,33 @@ int main(int argc, char * argv[]) {
             WTERMSIG(stat),
             exceeded_limit.empty() ? "none" : exceeded_limit.c_str());
 
-    int ret;
-    ret = write(3, status_report, strlen(status_report));
-    (void)ret;
+    write(3, status_report, strlen(status_report));
 
     // close output earlier so the process read the status can start to do other things.
-    ret = close(3);
-    (void)ret;
+    close(3);
 
-    clean_cg_exit(cg, config.pass_exitcode ? WEXITSTATUS(stat) : EXIT_SUCCESS);
-    return 0;
+    return config.pass_exitcode ? WEXITSTATUS(stat) : EXIT_SUCCESS;
 }
 
+int main(int argc, char * argv[]) {
+    if (argc <= 1) print_help();
+
+    init_default_config();
+    parse_cli_options(argc, argv);
+
+    check_config();
+    check_environment();
+
+    INFO("pid = %d", (int)getpid());
+
+    create_cgroup();
+
+    {
+        Cgroup& cg = *config.active_cgroup;
+        setup_cgroup();
+        int ret = run_command();
+        clean_cg_exit(cg, ret);
+    }
+
+    return 0;
+}
