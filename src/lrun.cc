@@ -61,6 +61,8 @@ static struct {
     std::map<std::pair<Cgroup::subsys_id_t, std::string>, std::string> cgroup_options;
 } config;
 
+static volatile sig_atomic_t signal_triggered = 0;
+
 static void print_help() {
     fprintf(stderr,
             "Run program with resources limited.\n"
@@ -436,14 +438,30 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
 }
 
 static void signal_handler(int signal) {
-    fprintf(stderr, "Receive signal %d, exiting...\n", signal);
-    fflush(stderr);
-    if (config.active_cgroup) {
-        clean_cg_exit(*config.active_cgroup, 4);
-    }
-    exit(4);
+    signal_triggered = signal;
 }
 
+static void setup_signal_handlers() {
+    struct sigaction action;
+
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    action.sa_handler = SIG_IGN;
+
+    // ignore SIGPIPE
+    sigaction(SIGPIPE, &action, NULL);
+    sigaction(SIGALRM, &action, NULL);
+
+    action.sa_handler = signal_handler;
+    sigaction(SIGHUP, &action, NULL);
+    sigaction(SIGINT, &action, NULL);
+    sigaction(SIGTERM, &action, NULL);
+    sigaction(SIGABRT, &action, NULL);
+    sigaction(SIGQUIT, &action, NULL);
+    sigaction(SIGFPE, &action, NULL);
+    sigaction(SIGILL, &action, NULL);
+    sigaction(SIGTRAP, &action, NULL);
+}
 
 int main(int argc, char * argv[]) {
     if (argc <= 1) print_help();
@@ -534,19 +552,6 @@ int main(int argc, char * argv[]) {
     if (config.enable_user_proc_namespace) clone_flags |= CLONE_NEWPID | CLONE_NEWIPC;
     config.arg.clone_flags = clone_flags;
 
-    // no sigpipe
-    signal(SIGPIPE, SIG_IGN);
-    signal(SIGALRM, SIG_IGN);
-
-    signal(SIGHUP, signal_handler);
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
-    signal(SIGABRT, signal_handler);
-    signal(SIGQUIT, signal_handler);
-
-    signal(SIGFPE, signal_handler);
-    signal(SIGILL, signal_handler);
-    signal(SIGTRAP, signal_handler);
 
     pid = cg.spawn(config.arg);
 
@@ -555,6 +560,9 @@ int main(int argc, char * argv[]) {
         clean_cg_exit(cg, 10 - pid);
     }
 
+    // prepare signal handlers and make lrun "higher priority"
+    setup_signal_handlers();
+    if (nice(-5) == -1) ERROR("can not renice");
 
     // monitor its cpu_usage and real time usage and memory usage
     double start_time = now();
@@ -567,6 +575,13 @@ int main(int argc, char * argv[]) {
     string exceeded_limit = "";
 
     while (running) {
+        // check signal
+        if (signal_triggered) {
+            fprintf(stderr, "Receive signal %d, exiting...\n", signal_triggered);
+            fflush(stderr);
+            clean_cg_exit(cg, 4);
+        }
+
         // check stat
         int e = waitpid(pid, &stat, WNOHANG);
 
