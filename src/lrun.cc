@@ -663,6 +663,12 @@ int main(int argc, char * argv[]) {
             cg.cpu_usage(), now() - start_time, cg.memory_current() / 1.e6, cg.memory_peak() / 1.e6);
         }
 
+        // check empty
+        if (cg.empty()) {
+            INFO("no process remaining");
+            running = false;
+        }
+
         // sleep for a while
         usleep(config.interval);
     }

@@ -167,6 +167,13 @@ namespace lrun {
             // Cgroup high level methods
 
             /**
+             * test if the cgroup has zero processes attached
+             * @return  1           yes, the cgroup has no processes attached
+             *          0           no, the cgroup has processes attached
+             */
+            int empty();
+
+            /**
              * kill all tasks until no more tasks alive.
              * the method will block until all tasks are confirmed gone.
              */

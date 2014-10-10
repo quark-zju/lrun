@@ -260,6 +260,11 @@ void Cgroup::freeze(int freeze) {
     }
 }
 
+int Cgroup::empty() {
+    string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
+    return fs::read(procs_path, 4).empty() ? 1 : 0;
+}
+
 void Cgroup::killall() {
 
     // return immediately if cgroup is not valid
