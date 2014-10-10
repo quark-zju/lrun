@@ -528,11 +528,9 @@ int main(int argc, char * argv[]) {
     // some cgroup options, fail quietly
     cg.set(Cgroup::CG_MEMORY, "memory.swappiness", "0\n");
 
-    // disable oom killer because it will make dmesg noisy.
-    // note: this may cause the child process freeze (D state) before execve,
-    // we have MIN_MEMORY_LIMIT so it probably won't happen.
-    // old memory cgroup subsystem does not know this, ignore silently.
-    cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "1\n");
+    // enable oom killer now so our buggy code won't freeze.
+    // we will disable it later.
+    cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "0\n");
 
     // other cgroup options
     FOR_EACH(p, config.cgroup_options) {

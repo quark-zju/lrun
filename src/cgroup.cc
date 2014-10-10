@@ -217,7 +217,7 @@ list<pid_t> Cgroup::get_pids() {
 
 static const int FREEZE_INCREASE_MEM_LIMIT_STEP = 8192;  // 8 K
 static const useconds_t FREEZE_KILL_WAIT_INTERVAL = 10000;  // 10 ms
-static const int FREEZE_ATTEMPTS_BEFORE_ENABLE_OOM = 16;
+static const int FREEZE_ATTEMPTS_BEFORE_ENABLE_OOM = 12;
 
 void Cgroup::freeze(int freeze) {
     if (!valid()) return;
@@ -231,18 +231,17 @@ void Cgroup::freeze(int freeze) {
         INFO("freezing");
         fs::write(freeze_state_path, "FROZEN\n");
 
-        for (int loop = 0, mem_limit_inc = 0;; ++loop) {
+        for (int loop = 0, attempt = 0;; ++loop) {
             int frozen = (strncmp(fs::read(freeze_state_path, 4).c_str(), "FRO", 3) == 0);
             if (frozen) break;
 
-            if (mem_limit_inc < FREEZE_ATTEMPTS_BEFORE_ENABLE_OOM && mem_limit_inc >= 0) {
+            if (attempt < FREEZE_ATTEMPTS_BEFORE_ENABLE_OOM && attempt >= 0) {
                 INFO("increase memory limit by %d to \"help\" freezer", FREEZE_INCREASE_MEM_LIMIT_STEP);
                 set_memory_limit(memory_peak() + FREEZE_INCREASE_MEM_LIMIT_STEP);
-                ++mem_limit_inc;
-            } else if (mem_limit_inc >= 0)  {
-                INFO("enable OOM killer");
-                set_memory_limit(1);
-                if (set(CG_MEMORY, "memory.oom_control", "0\n") == 0) mem_limit_inc = -1;
+                ++attempt;
+            } else if (attempt >= 0)  {
+                INFO("enabling OOM killer");
+                if (set(CG_MEMORY, "memory.oom_control", "0\n") == 0) attempt = -1;
             }
 
             usleep(FREEZE_KILL_WAIT_INTERVAL);
@@ -804,11 +803,11 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         INFO("seems child exec failed");
         child_pid = -4;
     } else {
-        // disable oom killer now
-        // oom killer writes a super long log, disable it
+        // disable oom killer because it will make dmesg noisy.
         // Note: a process can enter D (uninterruptable sleep) status
         // when oom killer disabled, killing it requires re-enable oom killer
         // or enlarge memory limit
+        INFO("disabling oom killer");
         if (set(CG_MEMORY, "memory.oom_control", "1\n")) INFO("can not set memory.oom_control");
     }
 
