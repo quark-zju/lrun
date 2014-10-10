@@ -665,6 +665,76 @@ static int clone_fn(void * clone_arg) {
     return -1;
 } // clone_fn
 
+static string clone_flags_to_str(int clone_flags) {
+    int v = clone_flags;
+    string s;
+#define TEST_FLAG(x) if ((v & x) != 0) { s += string(# x) + " | "; v ^= x; }
+    TEST_FLAG(CLONE_VM);
+    TEST_FLAG(CLONE_FS);
+    TEST_FLAG(CLONE_FILES);
+    TEST_FLAG(CLONE_SIGHAND);
+    TEST_FLAG(CLONE_PTRACE);
+    TEST_FLAG(CLONE_VFORK);
+    TEST_FLAG(CLONE_PARENT);
+    TEST_FLAG(CLONE_THREAD);
+    TEST_FLAG(CLONE_NEWNS);
+    TEST_FLAG(CLONE_SYSVSEM);
+    TEST_FLAG(CLONE_SETTLS);
+    TEST_FLAG(CLONE_PARENT_SETTID);
+    TEST_FLAG(CLONE_CHILD_CLEARTID);
+    TEST_FLAG(CLONE_DETACHED);
+    TEST_FLAG(CLONE_UNTRACED);
+    TEST_FLAG(CLONE_CHILD_SETTID);
+    TEST_FLAG(CLONE_NEWUTS);
+    TEST_FLAG(CLONE_NEWIPC);
+    TEST_FLAG(CLONE_NEWUSER);
+    TEST_FLAG(CLONE_NEWPID);
+    TEST_FLAG(CLONE_NEWNET);
+    TEST_FLAG(CLONE_IO);
+    TEST_FLAG(SIGCHLD);
+
+    TEST_FLAG(SIGINT);
+    TEST_FLAG(SIGQUIT);
+    TEST_FLAG(SIGILL);
+    TEST_FLAG(SIGTRAP);
+    TEST_FLAG(SIGABRT);
+    TEST_FLAG(SIGIOT);
+    TEST_FLAG(SIGBUS);
+    TEST_FLAG(SIGFPE);
+    TEST_FLAG(SIGKILL);
+    TEST_FLAG(SIGUSR1);
+    TEST_FLAG(SIGSEGV);
+    TEST_FLAG(SIGUSR2);
+    TEST_FLAG(SIGPIPE);
+    TEST_FLAG(SIGALRM);
+    TEST_FLAG(SIGTERM);
+    TEST_FLAG(SIGSTKFLT);
+    TEST_FLAG(SIGCLD);
+    TEST_FLAG(SIGCHLD);
+    TEST_FLAG(SIGCONT);
+    TEST_FLAG(SIGSTOP);
+    TEST_FLAG(SIGTSTP);
+    TEST_FLAG(SIGTTIN);
+    TEST_FLAG(SIGTTOU);
+    TEST_FLAG(SIGURG);
+    TEST_FLAG(SIGXCPU);
+    TEST_FLAG(SIGXFSZ);
+    TEST_FLAG(SIGVTALRM);
+    TEST_FLAG(SIGPROF);
+    TEST_FLAG(SIGWINCH);
+    TEST_FLAG(SIGPOLL);
+    TEST_FLAG(SIGIO);
+    TEST_FLAG(SIGPWR);
+    TEST_FLAG(SIGSYS);
+    TEST_FLAG(SIGUNUSED);
+#undef TEST_FLAG
+    if (v) {
+        s += strconv::from_long((long)v);
+    } else {
+        s = s.substr(0, s.length() - 3);
+    }
+    return s;
+}
 
 pid_t Cgroup::spawn(spawn_arg& arg) {
     // uid and gid should > 0
@@ -693,69 +763,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     char buf[] = "RUN";
 
     DEBUG_DO {
-        int v = clone_flags;
-        string s;
-        #define TEST_FLAG(x) if ((v & x) != 0) { s += string(# x) + " | "; v ^= x; }
-        TEST_FLAG(CLONE_VM);
-        TEST_FLAG(CLONE_FS);
-        TEST_FLAG(CLONE_FILES);
-        TEST_FLAG(CLONE_SIGHAND);
-        TEST_FLAG(CLONE_PTRACE);
-        TEST_FLAG(CLONE_VFORK);
-        TEST_FLAG(CLONE_PARENT);
-        TEST_FLAG(CLONE_THREAD);
-        TEST_FLAG(CLONE_NEWNS);
-        TEST_FLAG(CLONE_SYSVSEM);
-        TEST_FLAG(CLONE_SETTLS);
-        TEST_FLAG(CLONE_PARENT_SETTID);
-        TEST_FLAG(CLONE_CHILD_CLEARTID);
-        TEST_FLAG(CLONE_DETACHED);
-        TEST_FLAG(CLONE_UNTRACED);
-        TEST_FLAG(CLONE_CHILD_SETTID);
-        TEST_FLAG(CLONE_NEWUTS);
-        TEST_FLAG(CLONE_NEWIPC);
-        TEST_FLAG(CLONE_NEWUSER);
-        TEST_FLAG(CLONE_NEWPID);
-        TEST_FLAG(CLONE_NEWNET);
-        TEST_FLAG(CLONE_IO);
-        TEST_FLAG(SIGCHLD);
-
-        TEST_FLAG(SIGINT);
-        TEST_FLAG(SIGQUIT);
-        TEST_FLAG(SIGILL);
-        TEST_FLAG(SIGTRAP);
-        TEST_FLAG(SIGABRT);
-        TEST_FLAG(SIGIOT);
-        TEST_FLAG(SIGBUS);
-        TEST_FLAG(SIGFPE);
-        TEST_FLAG(SIGKILL);
-        TEST_FLAG(SIGUSR1);
-        TEST_FLAG(SIGSEGV);
-        TEST_FLAG(SIGUSR2);
-        TEST_FLAG(SIGPIPE);
-        TEST_FLAG(SIGALRM);
-        TEST_FLAG(SIGTERM);
-        TEST_FLAG(SIGSTKFLT);
-        TEST_FLAG(SIGCLD);
-        TEST_FLAG(SIGCHLD);
-        TEST_FLAG(SIGCONT);
-        TEST_FLAG(SIGSTOP);
-        TEST_FLAG(SIGTSTP);
-        TEST_FLAG(SIGTTIN);
-        TEST_FLAG(SIGTTOU);
-        TEST_FLAG(SIGURG);
-        TEST_FLAG(SIGXCPU);
-        TEST_FLAG(SIGXFSZ);
-        TEST_FLAG(SIGVTALRM);
-        TEST_FLAG(SIGPROF);
-        TEST_FLAG(SIGWINCH);
-        TEST_FLAG(SIGPOLL);
-        TEST_FLAG(SIGIO);
-        TEST_FLAG(SIGPWR);
-        TEST_FLAG(SIGSYS);
-        TEST_FLAG(SIGUNUSED);
-        #undef TEST_FLAG
-        INFO("clone flags = 0x%x = %s0x%x", (int)clone_flags, s.c_str(), v);
+        INFO("clone flags = 0x%x = %s", (int)clone_flags, clone_flags_to_str(clone_flags).c_str());
     }
 
     pid_t child_pid;
