@@ -164,7 +164,17 @@ static void print_help() {
 
 static void print_version() {
     printf("lrun " VERSION "\n"
-           "Copyright (C) 2012-2014 Jun Wu <quark@zju.edu.cn>\n");
+           "Copyright (C) 2012-2014 Jun Wu <quark@zju.edu.cn>\n"
+           "\n"
+           "libseccomp support: %s\n"
+           "debug support: %s\n",
+           seccomp::supported() ? "yes" : "no",
+#ifdef NDEBUG
+           "no"
+#else
+           "yes"
+#endif
+           );
     exit(0);
 }
 
