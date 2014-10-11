@@ -1,6 +1,6 @@
-BINARIES=fs_unit_test cgroup_unit_test strconv_unit_test
-CXXFLAGS=-I../src -g -std=c++0x -Wall `pkg-config --cflags --silence-errors libseccomp`
-LDFLAGS=`pkg-config --libs --silence-errors libseccomp`
+BINARIES=fs_unit_test cgroup_unit_test strconv_unit_test integration_test
+CXXFLAGS=-I../src -g -std=c++0x -Wall
+LD_SECCOMP_FLAGS=`pkg-config --libs --silence-errors libseccomp`
 LD=g++
 
 .PHONY: all clean
@@ -11,15 +11,16 @@ fs_unit_test:  test.o ../src/fs.o ../src/common.o fs_unit_test.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
 cgroup_unit_test: test.o ../src/cgroup.o ../src/strconv.o ../src/fs.o ../src/common.o ../src/seccomp.o cgroup_unit_test.o
-	$(LD) $(LDFLAGS) $^ -o $@
+	$(LD) $(LDFLAGS) $(LD_SECCOMP_FLAGS) $^ -o $@
 
 strconv_unit_test: test.o ../src/strconv.o ../src/common.o strconv_unit_test.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
-.o.cc:
+integration_test: test.o integration_test.o
+	$(LD) $(LDFLAGS) $^ -o $@
 
-.o:
-	$(CXX) $(LDFLAGS) $^ -o $@
+%.o: %.cc
+	$(CXX) $(CXXFLAGS) $^ -c -o $@
 
 clean:
 	-rm -f *.o $(BINARIES)
