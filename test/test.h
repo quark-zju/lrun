@@ -26,7 +26,10 @@
 namespace test {
     extern int total_case;
     extern int failed_case;
+    extern int at_new_line;
+    extern void new_line();
     extern void print_result();
+    extern void print_strings(int n = 0, ...);
 
     namespace term {
         namespace attr {
@@ -69,28 +72,37 @@ namespace test {
 #define TESTCASE(name) \
     void test_ ## name(); \
     __attribute__((constructor(65535))) void auto_test_ ## name() { \
-        test::term::set(test::term::attr::BOLD, test::term::fg::WHITE); \
-        printf("TEST CASE: %s\n", #name); \
         test::term::set(); \
+        test::new_line(); \
+        printf("[%s] ", #name); \
+        fflush(stdout); \
+        test::at_new_line = 0; \
         test_ ## name(); \
     } \
     void test_ ## name()
-        
+
 
 #define CONCAT_HELPER(a,b) a ## b
 #define CONCAT(a,b) CONCAT_HELPER(a,b)
-#define CHECK(cond) \
+#define CHECK(cond, ...) \
     test::total_case++; \
     test::term::set(); \
     int CONCAT(_chk_, __LINE__) = (int)(cond); \
     if (CONCAT(_chk_, __LINE__)) { \
         test::term::set(test::term::attr::RESET, test::term::fg::GREEN); \
-        printf("  PASS\n"); \
+        printf("."); \
         test::term::set(); \
+        fflush(stdout); \
+        test::at_new_line = 0; \
     } else { \
-        test::term::set(test::term::attr::RESET, test::term::fg::RED); \
-        printf("  FAILED: " __FILE__ " # %d : " #cond "\n", __LINE__); \
-        test::failed_case++; \
+        test::new_line(); \
+        test::term::set(test::term::attr::BOLD, test::term::fg::WHITE, test::term::bg::RED); \
+        printf(" FAILED "); \
         test::term::set(); \
+        printf(" at " __FILE__ " # %d : " #cond "\n", __LINE__); \
+        test::failed_case++; \
+        test::print_strings(__VA_ARGS__);\
+        fflush(stdout); \
+        test::at_new_line = 1; \
     } \
     if (!CONCAT(_chk_, __LINE__))

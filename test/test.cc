@@ -22,22 +22,25 @@
 
 #include "test.h"
 #include <cstdio>
+#include <cstdarg>
+#include <cstring>
 
 int DEBUG = 1;
 int test::total_case = 0;
 int test::failed_case = 0;
+int test::at_new_line = 1;
 
 __attribute__((destructor)) void test::print_result() {
-    test::term::set(test::term::attr::BOLD, test::term::fg::WHITE);
-    printf("SUMMARY\n");
+    new_line();
     test::term::set();
-    printf("  %-4d CHECKS\n", test::total_case);
+    printf("\n");
+    printf("%-4d CHECKS\n", test::total_case);
     if (test::failed_case == 0) {
         test::term::set(test::term::attr::BOLD, test::term::fg::GREEN);
-        printf("  ALL  PASSED\n");
+        printf("ALL  PASSED\n");
     } else {
         test::term::set(test::term::attr::BOLD, test::term::fg::RED);
-        printf("  %-4d FAILED\n", test::failed_case);
+        printf("%-4d FAILED\n", test::failed_case);
     }
     test::term::set();
 }
@@ -52,6 +55,27 @@ void test::term::set(int attr, int fg) {
 
 void test::term::set(int attr) {
     printf("\x1b[%dm", attr);
+}
+
+void test::print_strings(int n, ...) {
+    if (n == 0) return;
+    va_list vl;
+    va_start(vl, n);
+    puts("================");
+    for (int i = 0; i < n; ++i) {
+        char *s = va_arg(vl, char*);
+        if (i > 0) puts("----------------");
+        if (s[strlen(s) - 1] == '\n') printf("%s", s); else puts(s);
+    }
+    puts("================");
+    at_new_line = 1;
+    va_end(vl);
+}
+
+void test::new_line() {
+    if (at_new_line) return;
+    putchar('\n');
+    at_new_line = 1;
 }
 
 int main(int argc, char const *argv[]) {
