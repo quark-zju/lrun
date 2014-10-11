@@ -139,6 +139,7 @@ static void print_help() {
             "  --env             key value   Set environment variable before exec.\n"
             "  --fd              n           Do not close fd n.\n"
             "  --cmd             cmd         Execute system command after tmpfs mounted.\n"
+            "                                Only root can use this.\n"
             "  --group           gid         Set additional groups. Applied to lrun itself.\n"
             "\n"
             "Return value:\n"
@@ -373,6 +374,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             config.arg.keep_fds.insert((int)NEXT_LONG_LONG_ARG);
         } else if (option == "cmd") {
+            REQUIRE_ROOT;
             REQUIRE_NARGV(1);
             string cmd = NEXT_STRING_ARG;
             config.arg.cmd_list.push_back(cmd);
