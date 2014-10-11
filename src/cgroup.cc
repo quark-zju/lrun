@@ -36,6 +36,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -50,6 +51,18 @@ const char Cgroup::subsys_names[4][8] = {
     "memory",
     "devices",
     "freezer",
+};
+
+static struct {
+    const char *name;
+    unsigned int minor;
+    // major is missing because all basic_devices have major = 1
+} basic_devices[] = {
+    {"null", 3},
+    {"zero", 5},
+    {"full", 7},
+    {"random", 8},
+    {"urandom", 9},
 };
 
 std::string Cgroup::subsys_base_paths_[sizeof(subsys_names) / sizeof(subsys_names[0])];
@@ -338,11 +351,11 @@ int Cgroup::attach(pid_t pid) {
 int Cgroup::limit_devices() {
     int e = 0;
     e += set(CG_DEVICES, "devices.deny", "a");
-    e += set(CG_DEVICES, "devices.allow", "c 1:3 rwm"); // null
-    e += set(CG_DEVICES, "devices.allow", "c 1:5 rwm"); // zero
-    e += set(CG_DEVICES, "devices.allow", "c 1:7 rwm"); // full
-    e += set(CG_DEVICES, "devices.allow", "c 1:8 rwm"); // random
-    e += set(CG_DEVICES, "devices.allow", "c 1:9 rwm"); // urandom
+    for (size_t i = 0; i < sizeof(basic_devices) / sizeof(basic_devices[0]); ++i) {
+        long minor = basic_devices[i].minor;
+        string v = string("c 1:" + strconv::from_long(minor) + " rwm");
+        e += set(CG_DEVICES, "devices.allow", v);
+    }
     return e ? -1 : 0;
 }
 
@@ -491,7 +504,7 @@ static void do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
         const char * dest = p.first.c_str();
         const long long& size = p.second;
 
-        INFO("mount tmpfs %s (size = %lld)", dest, size);
+        INFO("mount tmpfs %s (size = %lld kB)", dest, size);
 
         int e = 0;
         if (size <= 0) {
@@ -503,6 +516,26 @@ static void do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
         if (e) {
             FATAL("mount tmpfs '%s' failed", dest);
         }
+    }
+}
+
+static void do_remount_dev(const Cgroup::spawn_arg& arg) {
+    if (!arg.remount_dev) return;
+
+    INFO("remount /dev");
+
+    int e;
+    // mount a minimal tmpfs to /dev
+    e = mount(NULL, "/dev", "tmpfs", MS_NOSUID, "size=64");
+    if (e) FATAL("remount /dev failed");
+
+    // create basic devices
+    for (size_t i = 0; i < sizeof(basic_devices) / sizeof(basic_devices[0]); ++i) {
+        string path = string("/dev/") + basic_devices[i].name;
+        unsigned int minor = basic_devices[i].minor;
+        e = mknod(path.c_str(), S_IFCHR | 0666 /* mode */, makedev(1 /* major */, minor));
+        if (!e) e = chmod(path.c_str(), 0666);
+        if (e) FATAL("failed to create dev: '%s'", path.c_str());
     }
 }
 
@@ -686,6 +719,7 @@ static int clone_main_fn(void * clone_arg) {
     do_chroot(arg);
     do_mount_proc(arg);
     do_mount_tmpfs(arg);
+    do_remount_dev(arg);
     do_chdir(arg);
     do_commands(arg);
     do_set_umask(arg);

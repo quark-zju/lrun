@@ -87,6 +87,8 @@ static void print_help() {
             "  --isolate-process bool        Isolate pid, ipc namespace\n"
             "  --basic-devices   bool        Enable devices whitelist:\n"
             "                                null, zero, full, random, urandom\n"
+            "  --remount-dev     bool        Remount /dev and create only basic\n"
+            "                                device files in it (see --basic-device)\n"
             "  --reset-env       bool        Clean environment variables.\n"
             "  --network         bool        Whether network access is permitted.\n"
             "  --pass-exitcode   bool        Discard lrun exit code, pass exit code as is.\n"
@@ -149,13 +151,14 @@ static void print_help() {
             "  No matter what order of options are, lrun process options in following\n"
             "  order:\n"
             "\n"
-            "    --fd, --bindfs, --chroot, (mount /proc), --tmpfs, --chdir, --cmd,\n"
-            "    --umask, --gid, --uid, (rlimit options), --env, --nice,\n"
+            "    --fd, --bindfs, --chroot, (mount /proc), --tmpfs, --remount-dev,\n"
+            "    --chdir, --cmd, --umask, --gid, --uid, (rlimit options), --env, --nice,\n"
             "    (cgroup limits), --syscalls\n"
             "\n"
             "Default options:\n"
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
-            "       --reset-env false --interval 0.02 --pass-exitcode false\\\n"
+            "       --remount-dev false --reset-env false --interval 0.02 \\\n"
+            "       --pass-exitcode false \\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
             "       --max-rtprio 0 --nice 0\n"
             "\n"
@@ -199,6 +202,8 @@ static void init_default_config() {
     config.arg.umask = 022;
     config.arg.chroot_path = "";
     config.arg.chdir_path = "";
+    config.arg.remount_dev = 0;
+    config.arg.reset_env = 0;
 
     // arg.rlimits settings
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
@@ -279,6 +284,9 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "basic-devices") {
             REQUIRE_NARGV(1);
             config.enable_devices_whitelist = NEXT_BOOL_ARG;
+        } else if (option == "remount-dev") {
+            REQUIRE_NARGV(1);
+            config.arg.remount_dev = NEXT_BOOL_ARG;
         } else if (option == "reset-env") {
             REQUIRE_NARGV(1);
             config.arg.reset_env = (int)NEXT_BOOL_ARG;
@@ -737,7 +745,7 @@ int main(int argc, char * argv[]) {
     check_config();
     check_environment();
 
-    INFO("pid = %d", (int)getpid());
+    INFO("lrun %s pid = %d", VERSION, (int)getpid());
 
     create_cgroup();
 

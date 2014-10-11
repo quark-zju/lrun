@@ -263,6 +263,7 @@ namespace lrun {
                 std::map<int, rlim_t> rlimits;
                                             // [resource, value] rlimit list
                 int reset_env;              // Do not inherit env
+                int remount_dev;            // Recreate a minimal dev
                 std::list<std::pair<std::string, std::string> > env_list;
                                             // environment variables whitelist
             };
