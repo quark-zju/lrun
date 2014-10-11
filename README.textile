@@ -38,10 +38,10 @@ h4. User permissions
 @lrun@ requires @root@ permission.
 
 If you want to run @lrun@ using a trusted non-root user, add that user to @lrun@ group.
-Although the user cannot use `--uid` option in this setup, he or she may be able to
-use `--bindfs` to access sensitive information. Keep this in mind.
+Although the user cannot use @--uid@ option in this setup, he or she may be able to
+use @--bindfs@ to access sensitive information. Keep this in mind.
 
-Running @sudo lrun@ is dangerous because `--uid` option is available.
+Running @sudo lrun@ is dangerous because @--uid@ option is available.
 
 h4. Building options
 
@@ -138,7 +138,7 @@ h3. Isolate processes
 </pre>
 
 Note: starting from lrun 0.9.6, on Linux >= 3.8, the user process won't run as pid 1.
-Instead, a dummy `init` process is spawned and the user process will run as pid 2.
+Instead, a dummy init process is spawned and the user process will run as pid 2.
 This avoids some potential issues because pid 1 has some special behaviors.
 
 h3. Change uid
@@ -148,7 +148,7 @@ h3. Change uid
 sudo: unknown uid 2000: who are you?
 </pre>
 
-Note: starting from lrun 0.9.5, non-root users cannot set `--uid` and `--gid` and root must set `--uid` and `--gid`.
+Note: starting from lrun 0.9.5, non-root users cannot set @--uid@ and @--gid@ and root must set @--uid@ and @--gid@.
 
 h3. Mount tmpfs
 
@@ -193,7 +193,7 @@ EXCEED   none
 
 h3. Realtime status
 
-Use `--status` to show realtime cpu, memory usage information:
+Use @--status@ to show realtime cpu, memory usage information:
 
 <pre>
 % lrun --status firefox
@@ -210,6 +210,6 @@ h2. Troubleshooting
 You may be using Debian. Memory controller is compiled but deactivated. Try adding @cgroup_enable=memory@ as a kernel parameter.
 When using grub2, this can be done by editing @GRUB_CMDLINE_LINUX@ in @/etc/default/grub@ and running @update-grub2@.
 
-*dmesg prints `trap ... ip:... sp:... in ...` and I don't want to see them*
+*dmesg prints @trap ... ip:... sp:... in ...@ and I don't want to see them*
 
-Try `sysctl -w debug.exception-trace=0`.
+Try @sysctl -w debug.exception-trace=0@.
