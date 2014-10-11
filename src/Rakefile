@@ -4,7 +4,7 @@ SRC          = FileList['*.cc']
 OBJ          = SRC.ext('o')
 BIN          = 'lrun'
 CXX          = ENV['CXX'] || 'g++'
-CXXFLAGS     = ENV['CXXFLAGS'] || '-O2 -Wall'
+CXXFLAGS     = ENV['CXXFLAGS'] || '-O2 -Wall -Wwrite-strings -pipe'
 LD           = ENV['LD'] || CXX
 PREFIX       = ENV['PREFIX'] || '/usr/local'
 INSTALL      = ENV['INSTALL'] || 'install'
@@ -16,7 +16,7 @@ NULL         = ENV['NULL'] || '/dev/null'
 NODEBUG_FLAG = ENV['NDEBUG'] ? '-DNDEBUG' : ''
 GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 
-FALLBACK_VER = 'v0.9.5'
+FALLBACK_VER = 'v0.9.6'
 
 CLEAN.include('*.o')
 CLOBBER.include(BIN)

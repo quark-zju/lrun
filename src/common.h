@@ -31,7 +31,7 @@
 #endif
 
 #ifndef VERSION
-# define VERSION "unknown"
+# define VERSION "v0.9.6"
 #endif
 
 #include <cstdio>

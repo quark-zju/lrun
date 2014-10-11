@@ -8,7 +8,7 @@ h2. Dependencies
 
 h3. Runtime dependencies
 
-* *linux*: (>= 2.6.26) you can check kernel config by @utils/check_linux_config.rb@.
+* *linux*: (>= 2.6.26 minimal, >= 3.8 recommended) you can check kernel config using @utils/check_linux_config.rb@.
 * *libseccomp*: (optionally, 1.x or 2.x) to enable syscall filtering feature.
 
 h3. Build dependencies
@@ -134,17 +134,21 @@ h3. Isolate processes
 10140
 
 % lrun --isolate-process true bash -c 'echo $$'
-1
+2  # or 1, see Note below
 </pre>
 
-h3. Change uid
+Note: starting from lrun 0.9.6, on Linux >= 3.8, the user process won't run as pid 1.
+Instead, a dummy `init` process is spawned and the user process will run as pid 2.
+This avoids some potential issues because pid 1 has some special behaviors.
 
-Note: starting from lrun 0.9.5, non-root users cannot set `--uid` and `--gid` and root must set `--uid` and `--gid`.
+h3. Change uid
 
 <pre>
 % sudo lrun --uid 2000 --gid 200 /usr/bin/sudo ls
 sudo: unknown uid 2000: who are you?
 </pre>
+
+Note: starting from lrun 0.9.5, non-root users cannot set `--uid` and `--gid` and root must set `--uid` and `--gid`.
 
 h3. Mount tmpfs
 
@@ -206,3 +210,6 @@ h2. Troubleshooting
 You may be using Debian. Memory controller is compiled but deactivated. Try adding @cgroup_enable=memory@ as a kernel parameter.
 When using grub2, this can be done by editing @GRUB_CMDLINE_LINUX@ in @/etc/default/grub@ and running @update-grub2@.
 
+*dmesg prints `trap ... ip:... sp:... in ...` and I don't want to see them*
+
+Try `sysctl -w debug.exception-trace=0`.
