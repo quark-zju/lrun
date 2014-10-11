@@ -132,7 +132,7 @@ TESTCASE(umount) {
     } else {
         CHECK(fs::umount(TMP "/_um") == 0);
         // in case fs::umount fails
-        system("umount " TMP "/_um 2>/dev/null"); 
+        system("umount " TMP "/_um 2>/dev/null");
     }
 
     // clean up
@@ -166,7 +166,6 @@ TESTCASE(mount_tmpfs) {
 TESTCASE(chmod) {
     system("touch " TMP "/_c");
     fs::chmod(TMP "/_c", 0321);
-    system("stat -c%a " TMP "/_c");
     CHECK(system("test `stat -c \045a " TMP "/_c` = 321") == 0);
     fs::chmod(TMP "/_c", 0777);
     CHECK(system("test `stat -c \045a " TMP "/_c` = 777") == 0);
