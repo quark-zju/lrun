@@ -16,7 +16,7 @@ NULL         = ENV['NULL'] || '/dev/null'
 NODEBUG_FLAG = ENV['NDEBUG'] ? '-DNDEBUG' : ''
 GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 
-FALLBACK_VER = 'v0.9.6'
+FALLBACK_VER = 'v0.9.7'
 
 CLEAN.include('*.o')
 CLOBBER.include(BIN)

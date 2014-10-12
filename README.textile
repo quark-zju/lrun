@@ -33,17 +33,19 @@ cd src
 rake install
 </pre>
 
-h4. User permissions
+h4. Configuration
 
-@lrun@ requires @root@ permission.
+@lrun@ does not have any config files. However, non-root users must be added to @lrun@ group to be able to run @lrun@:
 
-If you want to run @lrun@ using a trusted non-root user, add that user to @lrun@ group.
-Although the user cannot use @--uid@ option in this setup, he or she may be able to
-use @--bindfs@ to access sensitive information. Keep this in mind.
+<pre>
+gpasswd -a username lrun
+</pre>
 
-Running @sudo lrun@ is dangerous because @--uid@ option is available.
+Prior to 0.9.7, the user must be trusted because it's possible to get a root shell using the setting. Starting from 0.9.7, lrun enforced several checks. Known methods for privilege escalations are eliminated.
 
-h4. Building options
+Running @lrun@ using @sudo@ is possible but be aware of security issues. If a user can run lrun using @sudo@, consider he or she has @root@ privileges. For that reason, adding @lrun@ to @sudo@ whitelist is hardly meaningful.
+
+h4. Build options
 
 There are several environment variables which can affect building process:
 
@@ -137,9 +139,7 @@ h3. Isolate processes
 2  # or 1, see Note below
 </pre>
 
-Note: starting from lrun 0.9.6, on Linux >= 3.8, the user process won't run as pid 1.
-Instead, a dummy init process is spawned and the user process will run as pid 2.
-This avoids some potential issues because pid 1 has some special behaviors.
+Note: starting from 0.9.6, on Linux >= 3.8, the user process won't run as pid 1. Instead, a dummy init process is spawned and the user process will run as pid 2. This avoids some potential issues because pid 1 has some special behaviors.
 
 h3. Change uid
 
@@ -148,7 +148,7 @@ h3. Change uid
 sudo: unknown uid 2000: who are you?
 </pre>
 
-Note: starting from lrun 0.9.5, non-root users cannot set @--uid@ and @--gid@ and root must set @--uid@ and @--gid@.
+Note: starting from 0.9.5, non-root users cannot set @--uid@ and @--gid@ and root must set @--uid@ and @--gid@.
 
 h3. Mount tmpfs
 
@@ -170,6 +170,8 @@ EXITCODE 1
 TERMSIG  0
 EXCEED   none
 </pre>
+
+Note: starting from 0.9.7, non-root users can only mount A to B if he or she can read A and write B, for most cases.
 
 h3. Syscall filter
 
