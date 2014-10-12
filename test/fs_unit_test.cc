@@ -95,6 +95,7 @@ TESTCASE(is_accessible) {
     CHECK(fs::is_accessible("/bin/bash", R_OK));
     CHECK(!fs::is_accessible("/proc/self/io", W_OK));
     CHECK(!fs::is_accessible("/proc/self/io", X_OK));
+    CHECK(fs::is_accessible(TMP, X_OK));
     system("rm -f " TMP "/_a1");
 }
 
@@ -246,6 +247,7 @@ TESTCASE(is_dir) {
     CHECK(fs::is_dir("/tmp"));
     CHECK(fs::is_dir("/var/lib"));
     CHECK(fs::is_dir("/proc/self"));
+    CHECK(fs::is_dir("/proc/1/fd"));
     CHECK(fs::is_dir("."));
     CHECK(fs::is_dir("/"));
     CHECK(!fs::is_dir("/proc1/self"));

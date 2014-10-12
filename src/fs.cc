@@ -180,12 +180,9 @@ string fs::read(const string& path, size_t max_length) {
 }
 
 int fs::is_dir(const string& path) {
-    DIR *dir = opendir(path.c_str());
-    if (dir) {
-        closedir(dir);
-        return 1;
-    }
-    return 0;
+    struct stat buf;
+    if (stat(path.c_str(), &buf) == -1) return 0;
+    return S_ISDIR(buf.st_mode) ? 1 : 0;
 }
 
 int fs::mkdir_p(const string& dir, const mode_t mode) {
