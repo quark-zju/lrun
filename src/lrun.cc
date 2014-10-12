@@ -141,6 +141,7 @@ static void print_help() {
             "  --cmd             cmd         Execute system command after tmpfs mounted.\n"
             "                                Only root can use this.\n"
             "  --group           gid         Set additional groups. Applied to lrun itself.\n"
+            "                                Only root can use this.\n"
             "\n"
             "Return value:\n"
             "  - If lrun is unable to execute specified command, non-zero\n"
@@ -218,6 +219,7 @@ static void init_default_config() {
 
 static void parse_cli_options(int argc, char * argv[]) {
     config.arg.args = argv + 1;
+    config.arg.argc = argc - 1;
 
 #define REQUIRE_NARGV(n) \
     if (i + n >= argc) { \
@@ -228,18 +230,15 @@ static void parse_cli_options(int argc, char * argv[]) {
 #define NEXT_LONG_LONG_ARG (strconv::to_longlong(NEXT_STRING_ARG))
 #define NEXT_DOUBLE_ARG (strconv::to_double(NEXT_STRING_ARG))
 #define NEXT_BOOL_ARG (strconv::to_bool(NEXT_STRING_ARG))
-#define REQUIRE_ROOT \
-    { \
-        if (getuid() != 0) { \
-            fprintf(stderr, "Non-root users can not set '%s'.\n", option.c_str()); \
-            exit(1); \
-        } \
-    }
     for (int i = 1; i < argc; ++i) {
         // break if it is not option
         if (strncmp("--", argv[i], 2) != 0) {
             config.arg.args = argv + i;
+            config.arg.argc = argc - i;
             break;
+        } else {
+            config.arg.args = argv + i + 1;
+            config.arg.argc = argc - i - 1;
         }
 
         string option = argv[i] + 2;
@@ -310,11 +309,9 @@ static void parse_cli_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             config.arg.umask = (mode_t)NEXT_LONG_LONG_ARG;
         } else if (option == "uid") {
-            REQUIRE_ROOT;
             REQUIRE_NARGV(1);
             config.arg.uid = (uid_t)NEXT_LONG_LONG_ARG;
         } else if (option == "gid") {
-            REQUIRE_ROOT;
             REQUIRE_NARGV(1);
             config.arg.gid = (gid_t)NEXT_LONG_LONG_ARG;
         } else if (option == "syscalls" && seccomp::supported()) {
@@ -325,6 +322,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             switch (syscalls.data()[0]) {
                 case '!': case '-':
                     config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
+                    /* intended no break */
                 case '=': case '+':
                     config.arg.syscall_list = string(syscalls.data() + 1);
                     break;
@@ -374,7 +372,6 @@ static void parse_cli_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             config.arg.keep_fds.insert((int)NEXT_LONG_LONG_ARG);
         } else if (option == "cmd") {
-            REQUIRE_ROOT;
             REQUIRE_NARGV(1);
             string cmd = NEXT_STRING_ARG;
             config.arg.cmd_list.push_back(cmd);
@@ -393,9 +390,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             DEBUG_PROGRESS = 1;
 #endif
         } else if (option == "") {
-            // meet --, expect commands
-            if (i + 1 >= argc) print_help();
-            config.arg.args = argv + i + 1;
+            // meet --
             break;
         } else {
             fprintf(stderr, "Unknown option: '--%s'\nUse --help for information.\n", option.c_str());
@@ -410,17 +405,101 @@ static void parse_cli_options(int argc, char * argv[]) {
 #undef NEXT_BOOL_ARG
 }
 
-static void check_config() {
-    if (config.arg.uid == 0) {
-        fprintf(stderr,
-                "For security reason, running commands with uid = 0 is not allowed.\n"
-                "Please specify a user ID using `--uid`.\n");
-        exit(1);
+static string access_mode_to_str(int mode) {
+    string result;
+    if (mode & R_OK) result += "r";
+    if (mode & W_OK) result += "w";
+    if (mode & X_OK) result += "x";
+    return result;
+}
+
+static void check_path_permission(const string& path, std::vector<string>& error_messages, int mode = R_OK) {
+    // path should be absolute and accessible
+    if (!fs::is_absolute(path)) {
+        error_messages.push_back(
+                string("Relative paths are forbidden for non-root users.\n")
+                + "Please change: " + path);
+        return;
     }
+
+    if (fs::is_dir(path)) mode |= X_OK;
+    if (!fs::is_accessible(path, mode)) {
+        error_messages.push_back(
+                string("You do not have `") + access_mode_to_str(mode)
+                + "` permission on " + path);
+    }
+}
+
+static void check_config() {
+    int is_root = (getuid() == 0);
+    std::vector<string> error_messages;
+
+    if (config.arg.uid == 0) {
+        error_messages.push_back(
+                "For security reason, running commands with uid = 0 is not allowed.\n"
+                "Please specify a user ID using `--uid`.");
+    } else if (!is_root && config.arg.uid != getuid()) {
+        error_messages.push_back(
+                "For security reason, setting uid to other user requires root.");
+    }
+
     if (config.arg.gid == 0) {
-        fprintf(stderr,
+        error_messages.push_back(
                 "For security reason, running commands with gid = 0 is not allowed.\n"
-                "Please specify a group ID using `--gid`.\n");
+                "Please specify a user ID using `--uid`.");
+    } else if (!is_root && config.arg.gid != getgid()) {
+        error_messages.push_back(
+                "For security reason, setting gid to other group requires root.");
+    }
+
+    if (config.groups.size() > 0) {
+        error_messages.push_back(
+                "For security reason, `--group` requires root.");
+    }
+
+    if (config.arg.cmd_list.size() > 0) {
+        error_messages.push_back(
+                "For security reason, `--cmd` requires root.");
+    }
+
+    if (config.arg.argc <= 0) {
+        error_messages.push_back(
+                "command_args can not be empty.\n"
+                "Use `--help` to see full options.");
+    }
+
+    if (!is_root) {
+        // require absolute paths and r/w/x permissions
+        string chroot_path = config.arg.chroot_path;
+        if (!chroot_path.empty()) {
+            check_path_permission(chroot_path, error_messages);
+        }
+        if (!config.arg.chdir_path.empty()) {
+            string chdir_path = fs::join(chroot_path, config.arg.chdir_path);
+            check_path_permission(chdir_path, error_messages);
+        }
+        FOR_EACH(p, config.arg.bindfs_list) {
+            const string& dest = p.first;
+            const string& src = p.second;
+            check_path_permission(dest, error_messages, R_OK | W_OK);
+            check_path_permission(src, error_messages);
+        }
+        FOR_EACH(p, config.arg.tmpfs_list) {
+            string dest = fs::join(chroot_path, p.first);
+            // allow read-only tmpfs mount on some paths
+            // (useful to deny access to a subtree)
+            if (p.second == 0) {
+                if (dest == "/home" || dest == "/sys") continue;
+            }
+            check_path_permission(dest, error_messages, R_OK | W_OK);
+        }
+    }
+
+    if (error_messages.size() > 0) {
+        FOR_EACH(message, error_messages) {
+            fprintf(stderr, "%s\n\n", message.c_str());
+        }
+        fprintf(stderr, "Please fix these errors and try again.\n");
         exit(1);
     }
 }

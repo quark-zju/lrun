@@ -880,7 +880,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
         // switch to that pid namespace for our next clone
         string pidns_path = string(fs::PROC_PATH) + "/" + strconv::from_long(long(init_pid_)) + "/ns/pid";
-        INFO("set pid ns to the same as %s", pidns_path.c_str());
+        INFO("set pid ns to %s", pidns_path.c_str());
         int pidns_fd = open(pidns_path.c_str(), O_RDONLY);
         if (pidns_fd < 0) {
             ERROR("can not open pid namespace");

@@ -243,6 +243,7 @@ namespace lrun {
             struct spawn_arg {
                 int clone_flags;            // additional clone flags
                 char * const * args;        // exec args
+                int argc;                   // exec argc
                 uid_t uid;                  // uid (should not be 0)
                 gid_t gid;                  // gid (should not be 0)
                 mode_t umask;               // umask
