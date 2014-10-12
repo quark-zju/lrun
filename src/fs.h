@@ -22,9 +22,11 @@
 
 #pragma once
 
+#include <fcntl.h>
 #include <string>
 #include <sys/stat.h>
 #include <sys/mount.h>
+#include <unistd.h>
 
 // If kernel does not support shared mount, MS_{REC,PRIVATE,SHARED} are missing
 #ifndef MS_REC
@@ -50,6 +52,11 @@
 namespace lrun {
     namespace fs {
         /**
+         * Path separator, should be '/'
+         */
+        extern const char PATH_SEPARATOR;
+
+        /**
          * Path to file containing mounts information
          * Typically, it is "/proc/mounts"
          */
@@ -65,6 +72,50 @@ namespace lrun {
          * tmpfs type name: "tmpfs"
          */
         extern const char * const TYPE_TMPFS;
+
+        /**
+         * Join path
+         * @param  dirname      directory path
+         * @param  basename     file name, can contain separator
+         * @return joined path
+         */
+        std::string join(const std::string& dirname, const std::string& basename);
+
+        /**
+         * Test if a path is absolute
+         * @param  path         path to test
+         * @return 1            it's absolute
+         *         0            it's relative
+         */
+        bool is_absolute(const std::string& path);
+
+        /**
+         * Expand a path. Do not follow symbol links.
+         * @param  path         path to expand
+         * @return path         expanded path
+         */
+        std::string expand(const std::string& path);
+
+        /**
+         * Follow symbolic links, recursively
+         * @param  path         path to resolve
+         * @return path         resolved path, or:
+         *                        - expand(join(work_dir, path))
+         *                          if path cannot be resolved and path is not absolute
+         *                        - expand(path)
+         *                          if path is absolute
+         */
+        std::string resolve(const std::string& path, const std::string& work_dir = "");
+
+        /**
+         * Test access to a specified file
+         * @param  path         relative or absolute path
+         * @param  mode         refer to `man faccessat`
+         * @param  work_dir     work dir path, used to resolve related path
+         * @return 1            accessible
+         *         0            otherwise
+         */
+        bool is_accessible(const std::string& path, int mode = R_OK, const std::string& work_dir = "");
 
         /**
          * Write string content to file

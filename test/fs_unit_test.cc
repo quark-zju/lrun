@@ -30,6 +30,74 @@ using namespace lrun;
 
 #define TMP "/tmp"
 
+TESTCASE(join) {
+    CHECK(fs::join("", "") == "");
+    CHECK(fs::join("a", "") == "a");
+    CHECK(fs::join("", "b") == "b");
+    CHECK(fs::join("a", "b") == "a/b");
+    CHECK(fs::join("a/", "b") == "a/b");
+    CHECK(fs::join("a", "/b") == "a/b");
+    CHECK(fs::join("a/", "/b") == "a/b");
+}
+
+TESTCASE(is_absolute) {
+    CHECK(!fs::is_absolute(""));
+    CHECK(fs::is_absolute("/a/b"));
+    CHECK(!fs::is_absolute(".."));
+}
+
+TESTCASE(expand) {
+    CHECK(fs::expand("../../a") == "a");
+    CHECK(fs::expand("/a/../b/c/../d") == "/b/d");
+    CHECK(fs::expand("//////../../a/b/c/././../c//d") == "/a/b/c/d");
+    CHECK(fs::expand("..//////../../a/b/c/././../c//d") == "a/b/c/d");
+    CHECK(fs::expand("..././.../.") == ".../...");
+    CHECK(fs::expand("") == "");
+    CHECK(fs::expand("/") == "/");
+    CHECK(fs::expand("/..") == "/");
+    CHECK(fs::expand("../") == "");
+}
+
+TESTCASE(resolve) {
+    system("touch " TMP "/_r1");
+    system("ln -s " TMP "/_r1 " TMP "/_r2");
+    system("ln -s " TMP "/_r2 " TMP "/_r3");
+    system("ln -s " TMP "/_rnone " TMP "/_rn");
+    system("rm -f " TMP "/_rnone");
+    CHECK(fs::resolve(TMP) == TMP);
+    CHECK(fs::resolve("./_r1", TMP) == TMP "/_r1");
+    CHECK(fs::resolve("_r2", TMP) == TMP "/_r1");
+    CHECK(fs::resolve("./_r3", TMP) == TMP "/_r1");
+    CHECK(fs::resolve("./_rn", TMP) == TMP "/_rnone");
+    CHECK(fs::resolve(".." TMP "/./_r1", TMP) == TMP "/_r1");
+    CHECK(fs::resolve(".." TMP "/./_r2", TMP) == TMP "/_r1");
+    CHECK(fs::resolve(".." TMP "/./_r3", TMP) == TMP "/_r1");
+    CHECK(fs::resolve(".." TMP "/./_rn", TMP) == TMP "/_rnone");
+    CHECK(fs::resolve(TMP "/./_r1", TMP) == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/./_r2", TMP) == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/./_r3", TMP) == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/./_rn", TMP) == TMP "/_rnone");
+    system("rm -f " TMP "/_r1 " TMP "/_r2 " TMP "/_r3 " TMP "/_rn");
+}
+
+TESTCASE(is_accessible) {
+    system("touch " TMP "/_a1");
+    system("rm -f " TMP "/_an");
+    CHECK(fs::is_accessible(TMP));
+    CHECK(fs::is_accessible("./.", R_OK, TMP));
+    CHECK(fs::is_accessible(TMP "/_a1"));
+    CHECK(!fs::is_accessible(TMP "/_an"));
+    CHECK(fs::is_accessible("./_a1", R_OK, TMP));
+    CHECK(!fs::is_accessible("./_an", R_OK, TMP));
+    CHECK(fs::is_accessible(TMP "/_a1", R_OK, TMP));
+    CHECK(!fs::is_accessible(TMP "/_an", R_OK, TMP));
+    CHECK(fs::is_accessible("/dev/null", W_OK));
+    CHECK(fs::is_accessible("/bin/bash", R_OK));
+    CHECK(!fs::is_accessible("/proc/self/io", W_OK));
+    CHECK(!fs::is_accessible("/proc/self/io", X_OK));
+    system("rm -f " TMP "/_a1");
+}
+
 TESTCASE(mkdir_p) {
     // mkdir -p
     CHECK(fs::mkdir_p(TMP "/_t/1/2/3") >= 0);
@@ -101,7 +169,7 @@ TESTCASE(mount_bind) {
     system("mkdir -p " MB_TEST_BASE);
 
     if (system("mount -t ramfs none " MB_TEST_BASE " 2>/dev/null") != 0) {
-        puts("  Can not mount. Skipped.");
+        printf("Can not mount. Skipped.");
     } else {
         system("mkdir -p " MB_TEST_BASE "/_m/1/2/3");
         system("mkdir -p " MB_TEST_BASE "/_m/b");
@@ -128,7 +196,7 @@ TESTCASE(umount) {
     system("mkdir -p " TMP "/_um");
 
     if (system("mount -t ramfs none " TMP "/_um 2>/dev/null") != 0) {
-        puts("  Can not mount. Skipped.");
+        printf("Can not mount. Skipped.");
     } else {
         CHECK(fs::umount(TMP "/_um") == 0);
         // in case fs::umount fails
@@ -144,7 +212,7 @@ TESTCASE(mount_tmpfs) {
 
     int e = fs::mount_tmpfs(TMP "/_mt", 4096);
     if (e < 0 && errno == EPERM) {
-        puts("  No permission to mount. Skipped.");
+        printf("No permission to mount. Skipped.");
     } else {
         CHECK(e == 0) {
             perror("can not mount " TMP "/_mt");
