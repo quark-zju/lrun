@@ -31,6 +31,9 @@ unless File.respond_to?(:write)
   end
 end
 
+# Hack Debian PATH
+ENV['PATH'] = ENV['PATH'] + ':/sbin:/usr/sbin'
+
 # Helper methods
 # --------------
 
