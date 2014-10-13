@@ -456,20 +456,10 @@ static void check_config() {
     if (config.arg.gid == 0) {
         error_messages.push_back(
                 "For security reason, running commands with gid = 0 is not allowed.\n"
-                "Please specify a user ID using `--uid`.");
+                "Please specify a group ID using `--gid`.");
     } else if (!is_root && config.arg.gid != getgid()) {
         error_messages.push_back(
                 "For security reason, setting gid to other group requires root.");
-    }
-
-    if (config.groups.size() > 0) {
-        error_messages.push_back(
-                "For security reason, `--group` requires root.");
-    }
-
-    if (config.arg.cmd_list.size() > 0) {
-        error_messages.push_back(
-                "For security reason, `--cmd` requires root.");
     }
 
     if (config.arg.argc <= 0) {
@@ -479,6 +469,16 @@ static void check_config() {
     }
 
     if (!is_root) {
+        if (config.arg.cmd_list.size() > 0) {
+            error_messages.push_back(
+                    "For security reason, `--cmd` requires root.");
+        }
+
+        if (config.groups.size() > 0) {
+            error_messages.push_back(
+                    "For security reason, `--group` requires root.");
+        }
+
         // require absolute paths and r/w/x permissions
         string chroot_path = config.arg.chroot_path;
         if (!chroot_path.empty()) {
@@ -509,8 +509,8 @@ static void check_config() {
             string dest = p.first;
             if (config.arg.bindfs_list.count(dest) == 0) {
                 error_messages.push_back(
-                        "For security reason, `--remount-ro " + dest + "` is forbidden.\n"
-                        "`--remount-ro A` is only allowed if there is a `--bindfs A B`.");
+                        "For security reason, `--remount-ro A` is only allowed "
+                        "if there is a `--bindfs A B`.");
             }
         }
     }
