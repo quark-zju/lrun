@@ -100,9 +100,15 @@ static void print_help() {
             "                                Only root can set this.\n"
             "  --gid             gid         Set gid to specified gid (gid > 0).\n"
             "                                Only root can set this.\n"
+            "  --no-new-privs    bool        Do not allow getting higher privileges\n"
+            "                                using exec. This disables things like\n"
+            "                                sudo, ping, etc. Only root can set it\n"
+            "                                to false. Require Linux >= 3.5\n"
     );
     if (seccomp::supported()) {
         fprintf(stderr,
+            "                                Note: `--no-new-privs false` conflicts\n"
+            "                                with `--syscalls`\n"
             "  --syscalls        syscalls    Set syscall whitelist or blacklist.\n"
             "                                `syscalls` is a string starts with '!'\n"
             "                                or (optional) '='. Then a list of \n"
@@ -163,7 +169,7 @@ static void print_help() {
             "Default options:\n"
             "  lrun --network true --basic-devices false --isolate-process true \\\n"
             "       --remount-dev false --reset-env false --interval 0.02 \\\n"
-            "       --pass-exitcode false \\\n"
+            "       --pass-exitcode false --no-new-privs true \\\n"
             "       --max-nprocess 2048 --max-nfile 256 \\\n"
             "       --max-rtprio 0 --nice 0\n"
             "\n"
@@ -209,6 +215,7 @@ static void init_default_config() {
     config.arg.chdir_path = "";
     config.arg.remount_dev = 0;
     config.arg.reset_env = 0;
+    config.arg.no_new_privs = true;
 
     // arg.rlimits settings
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
@@ -320,6 +327,9 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "gid") {
             REQUIRE_NARGV(1);
             config.arg.gid = (gid_t)NEXT_LONG_LONG_ARG;
+        } else if (option == "no-new-privs") {
+            REQUIRE_NARGV(1);
+            config.arg.no_new_privs = NEXT_BOOL_ARG;
         } else if (option == "syscalls" && seccomp::supported()) {
             REQUIRE_NARGV(1);
             string syscalls = NEXT_STRING_ARG;
@@ -513,6 +523,18 @@ static void check_config() {
                         "if there is a `--bindfs A B`.");
             }
         }
+
+        if (config.arg.no_new_privs == false) {
+            error_messages.push_back(
+                    "For security remount, `--no-new-privs false` is forbidden "
+                    "for non-root users.");
+        }
+    }
+
+    if (config.arg.syscall_list.empty() && config.arg.syscall_action == seccomp::action_t::DEFAULT_EPERM) {
+        error_messages.push_back(
+                "Syscall filter forbids all syscalls, which is not allowed.");
+
     }
 
     if (error_messages.size() > 0) {

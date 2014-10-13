@@ -671,9 +671,36 @@ static void do_set_env(const Cgroup::spawn_arg& arg) {
 
 static void do_seccomp(const Cgroup::spawn_arg& arg) {
     // syscall whitelist
-    if (seccomp::supported() && seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
-        FATAL("seccomp failed");
-        exit(-1);
+    if (seccomp::supported() && arg.syscall_list.length() > 0) {
+        // apply seccomp, it will set PR_SET_NO_NEW_PRIVS
+        // libseccomp actually has an option to skip setting PR_SET_NO_NEW_PRIVS to 1
+        // however it makes seccomp_load error with EPERM.
+        if (seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
+            FATAL("seccomp failed");
+            exit(-1);
+        }
+    }
+
+    #ifndef PR_SET_NO_NEW_PRIVS
+    # define PR_SET_NO_NEW_PRIVS 38
+    #endif
+
+    #ifndef PR_GET_NO_NEW_PRIVS
+    # define PR_GET_NO_NEW_PRIVS 39
+    #endif
+
+    if (arg.no_new_privs) {
+        int e = prctl(PR_GET_NO_NEW_PRIVS, 0, 0, 0, 0);
+        if (e == -1) {
+            INFO("NO_NEW_PRIVS is not supported by kernel");
+        } else if (e == 0) {
+            INFO("prctl PR_SET_NO_NEW_PRIVS");
+            int e = prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+            if (e) {
+                FATAL("prctl PR_SET_NO_NEW_PRIVS");
+                exit(-1);
+            }
+        }
     }
 }
 
