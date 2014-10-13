@@ -426,6 +426,23 @@ static void do_privatize_filesystem(const Cgroup::spawn_arg& arg) {
     }
 }
 
+static void do_remounts(const Cgroup::spawn_arg& arg) {
+    FOR_EACH(p, arg.remount_list) {
+        const string& dest = p.first;
+        unsigned long flags = p.second;
+        // tricky point: if the original mount point has --bind, remount with --bind
+        // can make it less likely to get "device busy" message
+        if (arg.bindfs_list.count(dest)) flags |= MS_BIND;
+
+        INFO("remount %s", dest.c_str());
+        for (;;) {
+            if (fs::remount(dest, flags) == 0) break;
+            if (flags & MS_BIND) FATAL("remount '%s' failed", dest.c_str());
+            flags |= MS_BIND;
+        }
+    }
+}
+
 static void do_mount_bindfs(const Cgroup::spawn_arg& arg) {
     // bind fs mounts
     FOR_EACH(p, arg.bindfs_list) {
@@ -716,6 +733,7 @@ static int clone_main_fn(void * clone_arg) {
     do_close_high_fds(arg);
     do_privatize_filesystem(arg);
     do_mount_bindfs(arg);
+    do_remounts(arg);
     do_chroot(arg);
     do_mount_proc(arg);
     do_mount_tmpfs(arg);

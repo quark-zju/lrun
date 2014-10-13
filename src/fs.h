@@ -167,12 +167,20 @@ namespace lrun {
         int chmod(const std::string& path, const mode_t mode);
 
         /**
+         * mount -o remount
+         * @param   dest        target path
+         * @param   flags       mount flags
+         * @reutrn  0           success
+         *         -1           failed
+         */
+        int remount(const std::string& dest, unsigned long flags);
+
+        /**
          * mount --bind -o nosuid
          * @param   src         source location
          * @param   dest        target path
          * @reutrn  0           success
          *         -1           failed
-         *         -2           failed to set readonly
          */
         int mount_bind(const std::string& src, const std::string& dest);
 

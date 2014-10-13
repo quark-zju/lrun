@@ -235,6 +235,11 @@ int fs::chmod(const std::string& path, const mode_t mode) {
     return ::chmod(path.c_str(), mode);
 }
 
+int fs::remount(const string& dest, unsigned long flags) {
+    int e = mount(NULL, dest.c_str(), NULL, MS_REMOUNT | flags, NULL);
+    return e;
+}
+
 int fs::mount_bind(const string& src, const string& dest) {
     int e = mount(src.c_str(),
                   dest.c_str(),

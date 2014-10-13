@@ -128,7 +128,9 @@ static void print_help() {
             "  --version                     Show version information.\n"
             "\n"
             "Options that could be used multiple times:\n"
-            "  --bindfs          dst src     Bind src path to dest path.\n"
+            "  --bindfs          dst src     Bind src to dst.\n"
+            "                                This is performed before chroot.\n"
+            "  --remount-ro      dst         Remount dst make it read-only.\n"
             "                                This is performed before chroot.\n"
             "  --tmpfs           path bytes  Mount writable tmpfs to specified path to\n"
             "                                hide filesystem subtree. size is in bytes.\n"
@@ -153,8 +155,9 @@ static void print_help() {
             "  No matter what order of options are, lrun process options in following\n"
             "  order:\n"
             "\n"
-            "    --fd, --bindfs, --chroot, (mount /proc), --tmpfs, --remount-dev,\n"
-            "    --chdir, --cmd, --umask, --gid, --uid, (rlimit options), --env, --nice,\n"
+            "    --fd, --bindfs, --remount-ro, --chroot, (mount /proc), --tmpfs,\n"
+            "    --remount-dev, --chdir, --cmd, --umask, --gid, --uid,\n"
+            "    (rlimit options), --env, --nice,\n"
             "    (cgroup limits), --syscalls\n"
             "\n"
             "Default options:\n"
@@ -340,11 +343,15 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "cgname") {
             REQUIRE_NARGV(1);
             config.cgname = NEXT_STRING_ARG;
+        } else if (option == "remount-ro") {
+            REQUIRE_NARGV(1);
+            string dst = NEXT_STRING_ARG;
+            config.arg.remount_list[dst] |= MS_RDONLY;
         } else if (option == "bindfs") {
             REQUIRE_NARGV(2);
             string dst = NEXT_STRING_ARG;
             string src = NEXT_STRING_ARG;
-            config.arg.bindfs_list.push_back(make_pair(dst, src));
+            config.arg.bindfs_list[dst] = src;
         } else if (option == "tmpfs") {
             REQUIRE_NARGV(2);
             string path = NEXT_STRING_ARG;
@@ -492,6 +499,16 @@ static void check_config() {
                 if (dest == "/home" || dest == "/sys") continue;
             }
             check_path_permission(dest, error_messages, R_OK | W_OK);
+        }
+        // restrict --remount-ro, only allows dst in --bindfs
+        // because something like `--remount-ro /` affects outside world
+        FOR_EACH(p, config.arg.remount_list) {
+            string dest = p.first;
+            if (config.arg.bindfs_list.count(dest) == 0) {
+                error_messages.push_back(
+                        "For security reason, `--remount-ro " + dest + "` is forbidden.\n"
+                        "`--remount-ro A` is only allowed if there is a `--bindfs A B`.");
+            }
         }
     }
 
