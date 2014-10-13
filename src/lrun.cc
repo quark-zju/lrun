@@ -228,6 +228,9 @@ static void parse_cli_options(int argc, char * argv[]) {
     if (i + n >= argc) { \
         fprintf(stderr, "Option '%s' requires %d argument%s.\n", option.c_str(), n, n > 1 ? "s" : ""); \
         exit(1); \
+    } else { \
+        config.arg.argc -= n; \
+        config.arg.args += n; \
     }
 #define NEXT_STRING_ARG string(argv[++i])
 #define NEXT_LONG_LONG_ARG (strconv::to_longlong(NEXT_STRING_ARG))
