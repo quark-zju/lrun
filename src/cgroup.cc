@@ -543,7 +543,7 @@ static void do_remount_dev(const Cgroup::spawn_arg& arg) {
 
     int e;
     // mount a minimal tmpfs to /dev
-    e = mount(NULL, "/dev", "tmpfs", MS_NOSUID, "size=64");
+    e = mount(NULL, "/dev", "tmpfs", MS_NOSUID, "size=64,mode=0755,uid=0,gid=0");
     if (e) FATAL("remount /dev failed");
 
     // create basic devices
