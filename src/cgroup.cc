@@ -597,6 +597,8 @@ static void do_set_uid_gid(const Cgroup::spawn_arg& arg) {
     // setup uid, gid
     INFO("setgid %d, setuid %d", (int)arg.gid, (int)arg.uid);
     if (setgid(arg.gid) || setuid(arg.uid)) {
+        // an interesting story about not checking setuid return value:
+        // https://sites.google.com/site/fullycapable/Home/thesendmailcapabilitiesissue
         FATAL("setgid(%d) or setuid(%d) failed", (int)arg.gid, (int)arg.uid);
     }
 }
@@ -674,7 +676,8 @@ static void do_seccomp(const Cgroup::spawn_arg& arg) {
     if (seccomp::supported() && arg.syscall_list.length() > 0) {
         // apply seccomp, it will set PR_SET_NO_NEW_PRIVS
         // libseccomp actually has an option to skip setting PR_SET_NO_NEW_PRIVS to 1
-        // however it makes seccomp_load error with EPERM.
+        // however it makes seccomp_load error with EPERM because we just used setuid()
+        // and PR_SET_SECCOMP needs root if PR_SET_NO_NEW_PRIVS is unset.
         if (seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
             FATAL("seccomp failed");
             exit(-1);
