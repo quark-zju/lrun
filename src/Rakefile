@@ -67,6 +67,8 @@ def try_cxxflags(*flags)
   @cflags[flags.to_s] ||= flags.find do |flag|
     system "#{CXX} #{flag} #{blank_cpp_path} -E 1>#{NULL} 2>#{NULL}"
   end
+ensure
+  File.unlink blank_cpp_path rescue nil
 end
 
 def get_version
