@@ -253,6 +253,13 @@ namespace lrun {
                 std::string chroot_path;    // chroot path, empty if not need to chroot
                 std::string chdir_path;     // chdir path, empty if not need to chdir
                 std::string syscall_list;   // syscall whitelist or blacklist
+                struct {                    // set uts namespace strings
+                    std::string sysname;
+                    std::string nodename;
+                    std::string release;
+                    std::string version;
+                    std::string domainname;
+                } uts;
                 seccomp::action_t syscall_action;
                                             // syscall default action
                 std::list<std::pair<std::string, long long> > tmpfs_list;

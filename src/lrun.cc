@@ -125,6 +125,8 @@ static void print_help() {
             "                                and will not be deleted. If this option is \n"
             "                                not set, lrun will pick an unique cgroup name \n"
             "                                and destroy the cgroup upon exit.\n"
+            "  --hostname        string      Specify a new hostname.\n"
+            "  --domainname      string      Specify a new domain name.\n"
             "  --interval        seconds     Set interval status update interval.\n"
 #ifndef NDEBUG
             "  --debug                       Print debug messages.\n"
@@ -161,9 +163,9 @@ static void print_help() {
             "  No matter what order of options are, lrun process options in following\n"
             "  order:\n"
             "\n"
-            "    --fd, --bindfs, --remount-ro, --chroot, (mount /proc), --tmpfs,\n"
-            "    --remount-dev, --chdir, --cmd, --umask, --gid, --uid,\n"
-            "    (rlimit options), --env, --nice,\n"
+            "    --hostname, --domainname, --fd, --bindfs, --remount-ro, --chroot,\n"
+            "    (mount /proc), --tmpfs, --remount-dev, --chdir, --cmd, --umask, --gid,\n"
+            "    --uid, (rlimit options), --env, --nice,\n"
             "    (cgroup limits), --syscalls\n"
             "\n"
             "Default options:\n"
@@ -216,6 +218,7 @@ static void init_default_config() {
     config.arg.remount_dev = 0;
     config.arg.reset_env = 0;
     config.arg.no_new_privs = true;
+    config.arg.clone_flags = 0;
 
     // arg.rlimits settings
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
@@ -356,6 +359,28 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "cgname") {
             REQUIRE_NARGV(1);
             config.cgname = NEXT_STRING_ARG;
+        } else if (option == "hostname") {
+            REQUIRE_NARGV(1);
+            config.arg.uts.nodename = NEXT_STRING_ARG;
+            config.arg.clone_flags |= CLONE_NEWUTS;
+        } else if (option == "domainname") {
+            REQUIRE_NARGV(1);
+            config.arg.uts.domainname = NEXT_STRING_ARG;
+            config.arg.clone_flags |= CLONE_NEWUTS;
+        // these 3 ones are undocumented, only available with utsmod.ko loaded
+        // see https://github.com/quark-zju/mod_utsmod
+        } else if (option == "ostype") {
+            REQUIRE_NARGV(1);
+            config.arg.uts.sysname = NEXT_STRING_ARG;
+            config.arg.clone_flags |= CLONE_NEWUTS;
+        } else if (option == "osrelease") {
+            REQUIRE_NARGV(1);
+            config.arg.uts.release = NEXT_STRING_ARG;
+            config.arg.clone_flags |= CLONE_NEWUTS;
+        } else if (option == "osversion") {
+            REQUIRE_NARGV(1);
+            config.arg.uts.version = NEXT_STRING_ARG;
+            config.arg.clone_flags |= CLONE_NEWUTS;
         } else if (option == "remount-ro") {
             REQUIRE_NARGV(1);
             string dst = NEXT_STRING_ARG;
@@ -696,10 +721,9 @@ static int run_command() {
     pid_t pid = 0;
     bool running = true;
 
-    int clone_flags = 0;
+    int& clone_flags = config.arg.clone_flags;
     if (!config.enable_network) clone_flags |= CLONE_NEWNET;
     if (config.enable_user_proc_namespace) clone_flags |= CLONE_NEWPID | CLONE_NEWIPC;
-    config.arg.clone_flags = clone_flags;
 
     pid = cg.spawn(config.arg);
 

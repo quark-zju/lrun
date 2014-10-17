@@ -475,7 +475,13 @@ static void do_mount_proc(const Cgroup::spawn_arg& arg) {
         if (mount(NULL, "/proc", "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
             FATAL("mount procfs failed");
         }
-        // hide sensitive directories
+    }
+}
+
+static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
+    // currently there is no option about this behavior
+    // assume that --no-new-privs false users do not like this
+    if (arg.no_new_privs) {
         if ((arg.clone_flags & CLONE_NEWPID) && getpid() != 1) {
             mount(NULL, "/proc/1", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
         }
@@ -501,6 +507,46 @@ static list<int> get_fds() {
     if (namelist) free(namelist);
 
     return fds;
+}
+
+static void do_set_uts(const Cgroup::spawn_arg& arg) {
+    int e;
+    if (!arg.uts.domainname.empty()) {
+        INFO("setdomainname: %s", arg.uts.domainname.c_str());
+        e = setdomainname(arg.uts.domainname.c_str(), arg.uts.domainname.length());
+        if (e == -1) {
+            FATAL("setdomainname '%s' failed", arg.uts.domainname.c_str());
+            exit(-1);
+        }
+    }
+    if (!arg.uts.nodename.empty()) {
+        INFO("sethostname: %s", arg.uts.nodename.c_str());
+        e = sethostname(arg.uts.nodename.c_str(), arg.uts.nodename.length());
+        if (e == -1) {
+            FATAL("sethostname '%s' failed", arg.uts.nodename.c_str());
+            exit(-1);
+        }
+    }
+
+    // [[[cog
+    //  import cog
+    //  opts = {'release': 'osrelease', 'sysname': 'ostype', 'version': 'version'}
+    //  for opt, name in opts.items():
+    //    cog.out('''
+    //      if (!arg.uts.%(opt)s.empty() && fs::is_accessible("/proc/sys/utsmod/%(name)s"), W_OK) {
+    //          fs::write("/proc/sys/utsmod/%(name)s", arg.uts.%(opt)s);
+    //      }''' % {'name': name, 'opt': opt}, trimblanklines=True)
+    // ]]]
+    if (!arg.uts.release.empty() && fs::is_accessible("/proc/sys/utsmod/osrelease"), W_OK) {
+        fs::write("/proc/sys/utsmod/osrelease", arg.uts.release);
+    }
+    if (!arg.uts.sysname.empty() && fs::is_accessible("/proc/sys/utsmod/ostype"), W_OK) {
+        fs::write("/proc/sys/utsmod/ostype", arg.uts.sysname);
+    }
+    if (!arg.uts.version.empty() && fs::is_accessible("/proc/sys/utsmod/version"), W_OK) {
+        fs::write("/proc/sys/utsmod/version", arg.uts.version);
+    }
+    // [[[end]]]
 }
 
 static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
@@ -760,12 +806,14 @@ static int clone_main_fn(void * clone_arg) {
     // etc.
     do_set_sysctl();
 #endif
+    do_set_uts(arg);
     do_close_high_fds(arg);
     do_privatize_filesystem(arg);
     do_mount_bindfs(arg);
     do_remounts(arg);
     do_chroot(arg);
     do_mount_proc(arg);
+    do_hide_sensitive(arg);
     do_mount_tmpfs(arg);
     do_remount_dev(arg);
     do_chdir(arg);
