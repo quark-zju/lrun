@@ -724,12 +724,21 @@ static void do_seccomp(const Cgroup::spawn_arg& arg) {
         // libseccomp actually has an option to skip setting PR_SET_NO_NEW_PRIVS to 1
         // however it makes seccomp_load error with EPERM because we just used setuid()
         // and PR_SET_SECCOMP needs root if PR_SET_NO_NEW_PRIVS is unset.
-        if (seccomp::apply_simple_filter(arg.syscall_list.c_str(), arg.syscall_action)) {
-            FATAL("seccomp failed");
+        INFO("applying syscall filters");
+        seccomp::Rules rules(arg.syscall_action, (scmp_datum_t)(void*)arg.args /* special case for execve arg1 */);
+
+        if (rules.add_simple_filter(arg.syscall_list.c_str())) {
+            FATAL("failed to parse syscall filter string");
+            exit(-1);
+        }
+        if (rules.apply()) {
+            FATAL("failed to apply seccomp rules");
             exit(-1);
         }
     }
+}
 
+static void do_set_new_privs(const Cgroup::spawn_arg& arg) {
     #ifndef PR_SET_NO_NEW_PRIVS
     # define PR_SET_NO_NEW_PRIVS 38
     #endif
@@ -844,6 +853,7 @@ static int clone_main_fn(void * clone_arg) {
     }
 
     do_seccomp(arg);
+    do_set_new_privs(arg);
 
     // exec target
     INFO("execvp %s ...", arg.args[0]);

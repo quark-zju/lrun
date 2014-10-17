@@ -24,6 +24,12 @@
 
 #include "common.h"
 
+#include <cinttypes>
+
+extern "C" {
+#include <seccomp.h>
+}
+
 namespace lrun {
     namespace seccomp {
         enum action_t {
@@ -33,22 +39,60 @@ namespace lrun {
             OTHERS_EPERM,
         };
 
-        /**
-         * Apply simple syscall filter.
-         * Filter string format:
-         *  - syscall names splitted by ','
-         *  - put most frequently used syscall first.
-         * Filter string examples:
-         *      read,write,open,exit,brk
-         *
-         * @param  filter          syscall filter string.
-         * @param  default_action  default action, one of: ACTION_EPERM, ACTION_KILL, ACTION_ALLOW
-         *
-         * @return int      0      successful
-         *                  1      ignored. (libcseccomp does not exist)
-         *              other      other error.
-         */
-        int apply_simple_filter(const char * const filter, action_t default_action = DEFAULT_KILL);
+        struct Rules {
+            scmp_filter_ctx ctx;
+
+            /**
+             * @param  default_action  default action, one of: ACTION_EPERM, ACTION_KILL, ACTION_ALLOW
+             */
+            Rules(action_t default_action = DEFAULT_KILL, scmp_datum_t execve_arg1 = 0);
+
+            ~Rules();
+
+            /**
+             * Add rules using a string filter.
+             *
+             * STRING_FILTER  := SYSCALL_RULE | STRING_FILTER + ',' + SYSCALL_RULE
+             * SYSCALL_RULE   := SYSCALL_NAME + EXTRA_ARG_RULE + EXTRA_ACTION
+             * EXTRA_ARG_RULE := '' | '[' + ARG_RULES + ']'
+             * ARG_RULES      := ARG_RULE | ARG_RULES + ',' + ARG_RULE
+             * ARG_RULE       := ARG_NAME + ARG_OP1 + NUMBER | ARG_NAME + ARG_OP2 + '=' + NUMBER
+             * ARG_NAME       := 'a' | 'b' | 'c' | 'd' | 'e' | 'f'
+             * ARG_OP1        := '==' | '!=' | '>' | '<' | '>=' | '<='
+             * ARG_OP2        := '&'
+             * EXTRA_ACTION   := '' | ':k' | ':e' | ':a'
+             *
+             * Note:
+             *  - put most frequently used syscall first.
+             *
+             * Examples:
+             *  - read,write,open,exit,brk
+             *
+             * @param  filter          syscall filter string.
+             *
+             * @return int      0      successful
+             *                  1      syntax error
+             *                  2      not compatible with previous rules
+             *                  3      libseccomp error
+             */
+            int add_simple_filter(const char * const filter);
+
+            /**
+             * Apply the rules.
+             * Do not use this for multiple times.
+             *
+             * @return int      0      successful
+             *                  1      ignored. (libcseccomp does not exist)
+             *              other      other error
+             */
+            int apply();
+
+        private:
+            uint32_t scmp_action_;
+            uint32_t scmp_action_inverse_;
+            // allow execve if its arg1 is this value, the special case
+            scmp_datum_t execve_arg1_;
+        };
 
         /**
          * Check seccomp is supported or not
