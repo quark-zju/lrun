@@ -554,6 +554,11 @@ static void check_config() {
                     "For security remount, `--no-new-privs false` is forbidden "
                     "for non-root users.");
         }
+
+        if (config.arg.nice < 0) {
+            error_messages.push_back(
+                    "Non-root users cannot set a negative value of `--nice`");
+        }
     }
 
     if (config.arg.syscall_list.empty() && config.arg.syscall_action == seccomp::action_t::DEFAULT_EPERM) {
