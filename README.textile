@@ -41,7 +41,7 @@ h4. Configuration
 gpasswd -a username lrun
 </pre>
 
-Prior to 0.9.7, the user must be trusted because it's possible to get a root shell using the setting. Starting from 0.9.7, lrun enforced several checks. Known methods for privilege escalations are eliminated.
+Prior to 0.9.7, the user must be trusted because it's possible to get a root shell using the setting. Starting from 0.9.7, lrun enforced several checks. Known methods for privilege escalations are eliminated for Linux >= 3.5. If you are using a linux kernel < 3.5, consider lrun is a privilege escalation tool.
 
 Running @lrun@ using @sudo@ is possible but be aware of security issues. If a user can run lrun using @sudo@, consider he or she has @root@ privileges. For that reason, adding @lrun@ to @sudo@ whitelist is hardly meaningful.
 
@@ -69,6 +69,21 @@ yaourt -S lrun
 h2. Usage
 
 <pre>lrun --help</pre>
+
+h2. Output Format
+
+lrun writes its final output to fd 3. This makes it easier for you to pass @stdin@, @stdout@, @stderr@ to the child process. If lrun runs successfully, its fd 3 output is like (@#@ starts a comment), which is pretty self-explanatory:
+
+<pre>
+MEMORY   int         # in bytes
+CPUTIME  float       # in seconds
+REALTIME float       # in seconds
+SIGNALED int         # one of: 0, 1. 1 means the process is signaled (exit abnormally)
+EXITCODE int         # exit code
+TERMSIG  int         # signal number, 0 if not signaled
+EXCEED   excced_enum # one of: none, CPU_TIME, REAL_TIME, MEMORY, OUTPUT
+</pre>
+
 
 h2. Examples
 

@@ -30,7 +30,9 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include <stropts.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -64,118 +66,178 @@ static struct {
 
 static volatile sig_atomic_t signal_triggered = 0;
 
-static void print_help() {
-    fprintf(stderr,
+static int get_terminal_width() {
+    struct winsize ts;
+    ioctl(0, TIOCGWINSZ, &ts);
+    return ts.ws_col;
+}
+
+static string line_wrap(const string& content, size_t width, int indent, const string& join = "") {
+    string result;
+    int line_size = 0;
+    for (size_t i = 0; i < content.length(); ++i) {
+        char c = content[i];
+        if (c == ' ') {
+            // should we break here?
+            bool should_break = true;
+            // look ahead for the next space char
+            for (size_t j = i + 1; j <= content.length(); ++j) {
+                char d = (j == content.length() ? ' ' : content[j]);
+                if (d == ' ' && j - i + join.length() + line_size < width) {
+                    should_break = false;
+                    break;
+                }
+            }
+            if (should_break) {
+                result += join + "\n";
+                for (int i = 0; i < indent; ++i) result += ' ';
+                line_size = indent;
+            } else {
+                result += c;
+                ++line_size;
+            }
+        } else {
+            // can not split from here
+            result += c;
+            if (c == '\n') line_size = 0; else ++line_size;
+        }
+    }
+    return result;
+}
+
+static void print_help(const string& submodule = "") {
+    size_t width = isatty(2) ? (get_terminal_width() - 1) : -1;
+    const int MIN_WIDTH = 60;
+    if (width < MIN_WIDTH) width = MIN_WIDTH;
+    string content;
+
+    if (submodule == "syscalls") {
+        content = line_wrap(
+            "--syscall FILTER_STRING\n"
+            "  Default action for unlisted syscalls is to return EPERM.\n"
+            "\n"
+            "--syscall !FILTER_STRING\n"
+            "  Default action for unlisted syscalls is to allow.\n"
+            "\n"
+            , width, 2);
+        content += line_wrap(
+            "Format:\n"
+            "  FILTER_STRING  := SYSCALL_RULE | STRING_FILTER + ',' + SYSCALL_RULE\n"
+            "  SYSCALL_RULE   := SYSCALL_NAME + EXTRA_ARG_RULE + EXTRA_ACTION\n"
+            "  EXTRA_ARG_RULE := '' | '[' + ARG_RULES + ']'\n"
+            "  ARG_RULES      := ARG_RULE | ARG_RULES + ',' + ARG_RULE\n"
+            "  ARG_RULE       := ARG_NAME + ARG_OP1 + NUMBER | ARG_NAME + ARG_OP2 + '=' + NUMBER\n"
+            "  ARG_NAME       := 'a' | 'b' | 'c' | 'd' | 'e' | 'f'\n"
+            "  ARG_OP1        := '==' | '=' | '!=' | '!' | '>' | '<' | '>=' | '<='\n"
+            "  ARG_OP2        := '&'\n"
+            "  EXTRA_ACTION   := '' | ':k' | ':e' | ':a'\n"
+            "\n"
+            , width, 20);
+        content += line_wrap(
+            "Notes:\n"
+            "  ARG_NAME:     `a` for the first arg, `b` for the second, ...\n"
+            "  ARG_OP1:      `=` is short for `==`, `!` is short for `!=`\n"
+            "  ARG_OP2:      `&`: bitwise and\n"
+            "  EXTRA_ACTION: `k` is to kill, `e` is to return EPERM, `a` is to allow\n"
+            "  SYSCALL_NAME: syscall name or syscall number, ex: `read`, `0`, ...\n"
+            "\n"
+            , width, 16);
+        content += line_wrap(
+            "Examples:\n"
+            "  --syscalls 'read,write,open,exit'\n"
+            "    Only read, write, open, exit are allowed\n"
+            "  --syscalls '!write[a=2]'\n"
+            "    Disallow write to fd 2 (stderr)\n"
+            "  --syscalls '!sethostname:k'\n"
+            "    Whoever calls sethostname will get killed\n"
+            "  --syscalls '!clone[c&268435456==268435456]'\n"
+            "    Do not allow a new user namespace to be created (CLONE_NEWUSER = 0x10000000)\n"
+            , width, 4);
+    } else {
+        content =
             "Run program with resources limited.\n"
             "\n"
-            "Usage: lrun [ options ] [ -- ] command-args [ 3>stat ]\n"
-            "\n"
+            "Usage: lrun [options] [--] command-args [3>stat]\n"
+            "\n";
+        string options =
             "Options:\n"
-            "  --max-cpu-time    seconds     Limit cpu time, seconds can be rational.\n"
-            "  --max-real-time   seconds     Limit real time, seconds can be rational.\n"
-            "  --max-memory      bytes       Limit memory (+swap) usage in bytes.\n"
-            "                                This value should not be too small.\n"
-            "  --max-output      bytes       Limit output. Note: write to /dev/null\n"
-            "                                is counted and the limit is NOT accurate.\n"
-            "  --max-nprocess    n           Set RLIMIT_NPROC to n. Note: user namespace\n"
-            "                                is not seperated, current processes are\n"
-            "                                counted. Set uid to resolve this issue.\n"
-            /*"  --max-prio        n           Set max priority to n (0 <= n <= 40).\n"*/
-            "  --max-rtprio      n           Set max realtime priority to n.\n"
-            "  --max-nfile       n           Set max number of file descriptors to n.\n"
-            "  --max-stack       bytes       Set max stack size per process.\n"
-            "  --isolate-process bool        Isolate pid, ipc namespace\n"
-            "  --basic-devices   bool        Enable devices whitelist:\n"
-            "                                null, zero, full, random, urandom\n"
-            "  --remount-dev     bool        Remount /dev and create only basic\n"
-            "                                device files in it (see --basic-device)\n"
-            "  --reset-env       bool        Clean environment variables.\n"
-            "  --network         bool        Whether network access is permitted.\n"
-            "  --pass-exitcode   bool        Discard lrun exit code, pass exit code as is.\n"
-            "  --chroot          path        Chroot to specified path before exec.\n"
-            "  --chdir           path        Chdir to specified path after chroot.\n"
-            "  --nice            nice        Add nice with specified value.\n"
-            "  --umask           int         Set umask.\n"
-            "  --uid             uid         Set uid to specified uid (uid > 0).\n"
-            "                                Only root can set this.\n"
-            "  --gid             gid         Set gid to specified gid (gid > 0).\n"
-            "                                Only root can set this.\n"
-            "  --no-new-privs    bool        Do not allow getting higher privileges\n"
-            "                                using exec. This disables things like\n"
-            "                                sudo, ping, etc. Only root can set it\n"
-            "                                to false. Require Linux >= 3.5\n"
-    );
-    if (seccomp::supported()) {
-        fprintf(stderr,
-            "                                Note: `--no-new-privs false` conflicts\n"
-            "                                with `--syscalls`\n"
-            "  --syscalls        syscalls    Set syscall whitelist or blacklist.\n"
-            "                                `syscalls` is a string starts with '!' or\n"
-            "                                (optional) '='. Then a list of syscall names\n"
-            "                                or numbers separated by ','.\n"
-            "                                If `syscalls` starts with '!', it is a \n"
-            "                                blacklist, otherwise whitelist.\n"
-            "                                Note: you should make sure at least \n"
-            "                                execve can be used.\n"
-        );
-    }
-    fprintf(stderr,
-            "  --cgname          string      Specify cgroup name to use.\n"
-            "                                Specified cgroup will be created on demand, \n"
-            "                                and will not be deleted. If this option is \n"
-            "                                not set, lrun will pick an unique cgroup name \n"
-            "                                and destroy the cgroup upon exit.\n"
-            "  --hostname        string      Specify a new hostname.\n"
-            "  --domainname      string      Specify a new domain name.\n"
-            "  --interval        seconds     Set interval status update interval.\n"
+            "  --max-cpu-time    seconds     Limit cpu time. `seconds` can be a floating-point number\n"
+            "  --max-real-time   seconds     Limit physical time\n"
+            "  --max-memory      bytes       Limit memory (+swap) usage. `bytes` supports common suffix like `k`, `m`, `g`\n"
+            "  --max-output      bytes       Limit output. Note: lrun will make a \"best  effort\" to enforce the limit but it is NOT accurate\n"
+            "  --max-rtprio      n           Set max realtime priority\n"
+            "  --max-nfile       n           Set max number of file descriptors\n"
+            "  --max-stack       bytes       Set max stack size per process\n"
+            "  --max-nprocess    n           Set RLIMIT_NPROC. Note: user namespace is not separated, current processes are counted\n"
+            "  --isolate-process bool        Isolate PID, IPC namespace\n"
+            "  --basic-devices   bool        Enable device whitelist: null, zero, full, random, urandom\n"
+            "  --remount-dev     bool        Remount /dev and create only basic device files in it (see --basic-device)\n"
+            "  --reset-env       bool        Clean environment variables\n"
+            "  --network         bool        Whether network access is permitted\n"
+            "  --pass-exitcode   bool        Discard lrun exit code, pass child process's exit code\n"
+            "  --chroot          path        Chroot to specified `path` before exec\n"
+            "  --chdir           path        Chdir to specified `path` after chroot\n"
+            "  --nice            value       Add nice with specified `value`. Only root can use a negative value\n"
+            "  --umask           int         Set umask\n"
+            "  --uid             uid         Set uid (`uid` must > 0). Only root can use this\n"
+            "  --gid             gid         Set gid (`gid` must > 0). Only root can use this\n"
+            "  --no-new-privs    bool        Do not allow getting higher privileges using exec. This disables things like sudo, ping, etc. Only root can set it to false. Require Linux >= 3.5\n";
+        if (seccomp::supported()) options +=
+            "  --syscalls        syscalls    Apply a syscall filter. "
+            " `syscalls` is basically a list of syscall names separated by ',' with an optional prefix '!'. If prefix '!' exists, it's a blacklist otherwise a whitelist."
+            " For full syntax of `syscalls`, see `--help-syscalls`. Conflicts with `--no-new-privs false`\n";
+        options +=
+            "  --cgname          string      Specify cgroup name to use. The specified cgroup will be created on demand, and will not be deleted. If this option is not set, lrun will pick"
+            " an unique cgroup name and destroy it upon exit.\n"
+            "  --hostname        string      Specify a new hostname\n"
+            "  --interval        seconds     Set interval status update interval\n"
 #ifndef NDEBUG
-            "  --debug                       Print debug messages.\n"
-            "  --status                      Show realtime resource usage status.\n"
+            "  --debug                       Print debug messages\n"
+            "  --status                      Show realtime resource usage status\n"
 #endif
-            "  --help                        Show this help.\n"
-            "  --version                     Show version information.\n"
+            "  --help                        Show this help\n";
+        if (seccomp::supported()) options +=
+            "  --help-syscalls               Show full syntax of `syscalls`\n";
+        options +=
+            "  --version                     Show version information\n"
             "\n"
             "Options that could be used multiple times:\n"
-            "  --bindfs          dst src     Bind src to dst.\n"
-            "                                This is performed before chroot.\n"
-            "  --remount-ro      dst         Remount dst make it read-only.\n"
-            "                                This is performed before chroot.\n"
-            "  --tmpfs           path bytes  Mount writable tmpfs to specified path to\n"
-            "                                hide filesystem subtree. size is in bytes.\n"
-            "                                If bytes is 0, mount read-only.\n"
-            "                                This is performed after chroot.\n"
-            "  --cgroup-option   subsys key value\n"
-            "                                Apply cgroup setting before exec.\n"
-            "  --env             key value   Set environment variable before exec.\n"
-            "  --fd              n           Do not close fd n.\n"
-            "  --cmd             cmd         Execute system command after tmpfs mounted.\n"
-            "                                Only root can use this.\n"
-            "  --group           gid         Set additional groups. Applied to lrun itself.\n"
-            "                                Only root can use this.\n"
-            "\n"
+            "  --bindfs          dst src     Bind `src` to `dst`. This is performed before chroot. You should have read permission on `src` and write permission on `dst`\n"
+            "  --remount-ro      dst         Remount `dst` make it read-only. This is performed before bindfs. Non-root users can only use this on `dst`s specified in `--bindfs`\n"
+            "  --tmpfs           path bytes  Mount writable tmpfs to specified `path` to hide filesystem subtree. `size` is in bytes. If it is 0, mount read-only."
+            " This is performed after chroot. You should have write permission on `path`\n"
+            "  --env             key value   Set environment variable before exec\n"
+            "  --cgroup-option   subsys k v  Apply cgroup setting before exec\n"
+            "  --fd              n           Do not close fd `n`\n"
+            "  --cmd             cmd         Execute system command after tmpfs mounted. Only root can use this\n"
+            "  --group           gid         Set additional groups. Applied to lrun itself. Only root can use this\n"
+            "\n";
+        content += line_wrap(options, width, 32);
+        content += line_wrap(
             "Return value:\n"
-            "  - If lrun is unable to execute specified command, non-zero\n"
-            "    is returned and nothing will be written to fd 3.\n"
-            "  - Otherwise, lrun will return 0 and output time, memory usage,\n"
-            "    exit status of executed command to fd 3.\n"
+            "  - If lrun is unable to execute specified command, non-zero is returned and nothing will be written to fd 3\n"
+            "  - Otherwise, lrun will return 0 and output time, memory usage, exit status of executed command to fd 3\n"
+            "  - If `--pass-exitcode` is set to true, lrun will just pass exit code of the child process\n"
             "\n"
-            "Options order:\n"
-            "  No matter what order of options are, lrun process options in following\n"
-            "  order:\n"
+            , width, 4);
+        content += line_wrap(
+            "Option processing order:\n"
+            "  --hostname, --domainname, --fd, --bindfs, --remount-ro, --chroot, (mount /proc), --tmpfs,"
+            " --remount-dev, --chdir, --cmd, --umask, --gid, --uid, (rlimit options), --env, --nice,"
+            " (cgroup limits), --syscalls\n"
             "\n"
-            "    --hostname, --domainname, --fd, --bindfs, --remount-ro, --chroot,\n"
-            "    (mount /proc), --tmpfs, --remount-dev, --chdir, --cmd, --umask, --gid,\n"
-            "    --uid, (rlimit options), --env, --nice,\n"
-            "    (cgroup limits), --syscalls\n"
-            "\n"
+            , width, 2);
+        content += line_wrap(
             "Default options:\n"
-            "  lrun --network true --basic-devices false --isolate-process true \\\n"
-            "       --remount-dev false --reset-env false --interval 0.02 \\\n"
-            "       --pass-exitcode false --no-new-privs true \\\n"
-            "       --max-nprocess 2048 --max-nfile 256 \\\n"
-            "       --max-rtprio 0 --nice 0\n"
-            "\n"
-           );
+            "  lrun --network true --basic-devices false --isolate-process true"
+            " --remount-dev false --reset-env false --interval 0.02"
+            " --pass-exitcode false --no-new-privs true"
+            " --max-nprocess 2048 --max-nfile 256"
+            " --max-rtprio 0 --nice 0\n"
+            , width, 7, " \\");
+    }
+
+    fprintf(stderr, "%s\n", content.c_str());
     exit(0);
 }
 
@@ -267,7 +329,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             config.real_time_limit = NEXT_DOUBLE_ARG;
         } else if (option == "max-memory") {
             REQUIRE_NARGV(1);
-            long long max_memory = NEXT_LONG_LONG_ARG;
+            long long max_memory = strconv::to_bytes(NEXT_STRING_ARG);
             static const long long MIN_MEMORY_LIMIT = 500000LL;
             if (max_memory > 0 && max_memory < MIN_MEMORY_LIMIT) {
                 WARNING("max-memory too small, changed to %lld.", MIN_MEMORY_LIMIT);
@@ -276,7 +338,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             config.memory_limit = max_memory;
         } else if (option == "max-output") {
             REQUIRE_NARGV(1);
-            config.output_limit = NEXT_LONG_LONG_ARG;
+            config.output_limit = strconv::to_bytes(NEXT_STRING_ARG);
             config.arg.rlimits[RLIMIT_FSIZE] = config.output_limit;
         } else if (option == "max-nprocess") {
             REQUIRE_NARGV(1);
@@ -393,7 +455,7 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "tmpfs") {
             REQUIRE_NARGV(2);
             string path = NEXT_STRING_ARG;
-            long long bytes = NEXT_LONG_LONG_ARG;
+            long long bytes = strconv::to_bytes(NEXT_STRING_ARG);
             config.arg.tmpfs_list.push_back(make_pair(path, bytes));
         } else if (option == "cgroup-option") {
             REQUIRE_NARGV(3);
@@ -422,6 +484,8 @@ static void parse_cli_options(int argc, char * argv[]) {
             config.arg.cmd_list.push_back(cmd);
         } else if (option == "help") {
             print_help();
+        } else if (option == "help-syscalls") {
+            print_help("syscalls");
         } else if (option == "version") {
             print_version();
 #ifndef NDEBUG
@@ -438,7 +502,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             // meet --
             break;
         } else {
-            fprintf(stderr, "Unknown option: '--%s'\nUse --help for information.\n", option.c_str());
+            fprintf(stderr, "Unknown option: `--%s`\nUse --help for information.\n", option.c_str());
             exit(1);
         }
     }
