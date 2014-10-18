@@ -49,3 +49,13 @@ TESTCASE(to_bool) {
     CHECK(to_bool("1") == true);
     CHECK(to_bool("0") == false);
 }
+
+TESTCASE(to_bytes) {
+    CHECK(to_bytes("1234") == 1234);
+    CHECK(to_bytes("1099511627776b") == 1099511627776);
+    CHECK(to_bytes("-1234") == -1234);
+    CHECK(to_bytes("1k") == 1024);
+    CHECK(to_bytes("-2K") == -2048);
+    CHECK(to_bytes("0.5mb") == 524288);
+    CHECK(to_bytes("0.5GB") == 536870912);
+}

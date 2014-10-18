@@ -29,6 +29,7 @@ namespace lrun {
         long to_long(const std::string& str);
         long long to_longlong(const std::string& str);
         bool to_bool(const std::string& str);
+        long long to_bytes(const std::string& str);
 
         std::string from_double(double value, int precision = 0);
         std::string from_long(long value);

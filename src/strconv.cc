@@ -55,6 +55,31 @@ bool conv::to_bool(const string& str) {
     }
 }
 
+long long conv::to_bytes(const string& str) {
+    long long result = 1;
+    // accept str which ends with 'k', 'kb', 'm', 'M', etc.
+    int pos = str.length() - 1;
+    if (pos > 0 && (str[pos] == 'b' || str[pos] == 'B')) --pos;
+    if (pos > 0) {
+        switch (str[pos]) {
+            case 'g': case 'G':
+                result *= 1024;
+            case 'm': case 'M':
+                result *= 1024;
+            case 'k': case 'K':
+                result *= 1024;
+        }
+    }
+    if (result == 1) {
+        // read as long long
+        result = conv::to_longlong(str);
+    } else {
+        // read as double so that the user can use things like 0.5mb
+        result *= conv::to_double(str);
+    }
+    return result;
+}
+
 string conv::from_double(double value, int precision) {
     char buf[1024];
     char format[16];
