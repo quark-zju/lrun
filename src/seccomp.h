@@ -26,9 +26,11 @@
 
 #include <cinttypes>
 
+#if defined(LIBSECCOMP_VERSION_MAJOR) && LIBSECCOMP_VERSION_MAJOR <= 2 && LIBSECCOMP_VERSION_MAJOR > 0
 extern "C" {
 #include <seccomp.h>
 }
+#endif
 
 namespace lrun {
     namespace seccomp {
@@ -40,12 +42,14 @@ namespace lrun {
         };
 
         struct Rules {
+#if defined(LIBSECCOMP_VERSION_MAJOR) && LIBSECCOMP_VERSION_MAJOR <= 2 && LIBSECCOMP_VERSION_MAJOR > 0
             scmp_filter_ctx ctx;
+#endif
 
             /**
              * @param  default_action  default action, one of: ACTION_EPERM, ACTION_KILL, ACTION_ALLOW
              */
-            Rules(action_t default_action = DEFAULT_KILL, scmp_datum_t execve_arg1 = 0);
+            Rules(action_t default_action = DEFAULT_KILL, uint64_t execve_arg1 = 0);
 
             ~Rules();
 
@@ -91,7 +95,8 @@ namespace lrun {
             uint32_t scmp_action_;
             uint32_t scmp_action_inverse_;
             // allow execve if its arg1 is this value, the special case
-            scmp_datum_t execve_arg1_;
+            // scmp_datum_t is uint64_t
+            uint64_t execve_arg1_;
         };
 
         /**

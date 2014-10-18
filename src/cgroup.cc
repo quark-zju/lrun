@@ -725,7 +725,7 @@ static void do_seccomp(const Cgroup::spawn_arg& arg) {
         // however it makes seccomp_load error with EPERM because we just used setuid()
         // and PR_SET_SECCOMP needs root if PR_SET_NO_NEW_PRIVS is unset.
         INFO("applying syscall filters");
-        seccomp::Rules rules(arg.syscall_action, (scmp_datum_t)(void*)arg.args /* special case for execve arg1 */);
+        seccomp::Rules rules(arg.syscall_action, (uint64_t)(void*)arg.args /* special case for execve arg1 */);
 
         if (rules.add_simple_filter(arg.syscall_list.c_str())) {
             FATAL("failed to parse syscall filter string");

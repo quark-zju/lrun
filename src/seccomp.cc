@@ -68,7 +68,7 @@ static void get_scmp_action(uint32_t& scmp_action, uint32_t& scmp_action_inverse
     }
 }
 
-sc::Rules::Rules(action_t default_action, scmp_datum_t execve_arg1) {
+sc::Rules::Rules(action_t default_action, uint64_t execve_arg1) {
     execve_arg1_ = execve_arg1;
     ctx = NULL;
     get_scmp_action(scmp_action_, scmp_action_inverse_, default_action);
@@ -168,7 +168,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
                     }
                     if (priority) --priority;
                     // the special case: execve
-                    if (no == execve_no) {
+                    if (no == execve_no && execve_arg1_) {
                         execve_handled = true;
                         if (scmp_action_ != SCMP_ACT_ALLOW && current_action != SCMP_ACT_ALLOW && current_arg_array.empty()) {
                             // the user is trying to add execve to a blacklist
@@ -242,7 +242,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
         if (*p == 0) break;
     }
 
-    if (!execve_handled && scmp_action_ != SCMP_ACT_ALLOW) {
+    if (!execve_handled && scmp_action_ != SCMP_ACT_ALLOW && execve_arg1_) {
         // a whitelist with no execve yet, add ours
         reset_syscall_rule;
         current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_EQ, execve_arg1_));
@@ -277,7 +277,7 @@ int sc::supported() {
 
 #else
 
-sc::Rules::Rules(action_t action) {}
+sc::Rules::Rules(action_t, uint64_t) {}
 int sc::Rules::add_simple_filter(const char * const filter) { return 3; }
 int sc::Rules::apply() { return 1; }
 sc::Rules::~Rules() {}
