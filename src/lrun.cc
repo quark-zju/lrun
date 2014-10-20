@@ -222,7 +222,7 @@ static void print_help(const string& submodule = "") {
             , width, 4);
         content += line_wrap(
             "Option processing order:\n"
-            "  --hostname, --domainname, --fd, --bindfs, --remount-ro, --chroot, (mount /proc), --tmpfs,"
+            "  --hostname, --fd, --bindfs, --remount-ro, --chroot, (mount /proc), --tmpfs,"
             " --remount-dev, --chdir, --cmd, --umask, --gid, --uid, (rlimit options), --env, --nice,"
             " (cgroup limits), --syscalls\n"
             "\n"
