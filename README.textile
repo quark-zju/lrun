@@ -16,7 +16,7 @@ h3. Build dependencies
 * *rake*: process Rakefile.
 * *g++*: g++ 4.6 and above recommended, 4.4 should work as well. Or clang++
 * *install*: install binaries.
-* *pkg-config*: get information about libseccomp.
+* *pkg-config*: (optional) get information about libseccomp.
 * *git*: (optional) get version information.
 
 h3. Installation dependencies
@@ -56,6 +56,7 @@ There are several environment variables which can affect building process:
 * *INSTALL*: @install@ binary.
 * *LRUN_GROUP*: The group which have access to run lrun directly. Default is @lrun@.
 * *NDEBUG*: If set, remove some debug code and produce smaller executable.
+* *NOSECCOMP*: If set, always build without libseccomp support.
 
 h3. Archlinux
 

@@ -15,6 +15,7 @@ TMP_DIR      = ENV['TMP'] || ENV['TEMP'] || '/tmp'
 NULL         = ENV['NULL'] || '/dev/null'
 NODEBUG_FLAG = ENV['NDEBUG'] ? '-DNDEBUG' : ''
 GROUPADD     = ENV['GROUPADD'] || 'groupadd'
+NOSECCOMP    = ENV['NOSECCOMP']
 
 FALLBACK_VER = 'v0.9.8'
 
@@ -36,15 +37,19 @@ ENV['PATH'] = ENV['PATH'] + ':/sbin:/usr/sbin'
 
 # Helper methods
 # --------------
+def which(name, paths)
+  paths.split(':').each do |dir|
+    path = File.join(dir, name)
+    return path if File.exist?(path)
+  end
+  nil
+end
 
 def executable_exists?(name)
   # only interested in first word in name
   name = name.split.first
-  @executable_exists ||= {}
-  # assuming we are in Linux, check $PATH
-  @executable_exists[name] = ENV['PATH'].split(':').any? do |dir|
-    File.executable? File.join(dir, name)
-  end
+  path = which(name, ENV['PATH'])
+  path && File.executable?(path) ? true : false
 end
 
 def require_executable!(name)
@@ -52,9 +57,12 @@ def require_executable!(name)
 end
 
 def pkgconfig(params)
-  require_executable! 'pkg-config'
-  @pkgconfig_results ||= {}
-  @pkgconfig_results[params.to_s] ||= `pkg-config --silence-errors #{params}`.chomp
+  if executable_exists?('pkg-config')
+    @pkgconfig_results ||= {}
+    @pkgconfig_results[params.to_s] ||= `pkg-config --silence-errors #{params}`.chomp
+  else
+    nil
+  end
 end
 
 def try_cxxflags(*flags)
@@ -83,6 +91,40 @@ def get_version
     end
 end
 
+def get_libseccomp_version
+  @libseccomp_version ||= if NOSECCOMP
+    0
+  elsif executable_exists?('pkg-config')
+    pkgconfig('--modversion libseccomp').to_i
+  elsif File.exist?('/usr/include/seccomp.h')
+    [1, 2].find do |ver|
+      which("libseccomp.so.#{ver}", '/usr/lib:/usr/local/lib')
+    end || 0
+  end
+end
+
+def get_libseccomp_libs
+  case get_libseccomp_version
+  when 0
+    ''
+  else
+    pkgconfig('--libs libseccomp') || '-lseccomp'
+  end
+end
+
+def get_libseccomp_cflags
+  case get_libseccomp_version
+  when 0
+    ''
+  else
+    if executable_exists?('pkg-config')
+      pkgconfig('--cflags libseccomp')
+    else
+      ''
+    end
+  end
+end
+
 def root_sh(command)
   if Process.uid == 0
     sh command
@@ -100,16 +142,16 @@ task :default => [BIN]
 
 rule '.o' => '.cc' do |t|
   flags = [try_cxxflags('-std=c++11', '-std=c++0x', ''), CXXFLAGS, NODEBUG_FLAG,
-           "-DLIBSECCOMP_VERSION_MAJOR=#{pkgconfig('--modversion libseccomp').to_i}",
+           "-DLIBSECCOMP_VERSION_MAJOR=#{NOSECCOMP ? 0 : get_libseccomp_version}",
            "-DVERSION=\\\"#{get_version}\\\"",
-           pkgconfig('--cflags libseccomp')].join(' ')
+           get_libseccomp_cflags].join(' ')
   require_executable! CXX
   sh "#{CXX} #{flags} -c -o #{t.name} #{t.source}"
 end
 
 file BIN => OBJ do |t|
   require_executable! LD
-  sh "#{LD} -o #{t.name} #{t.prerequisites * ' '} #{pkgconfig('--libs libseccomp')}"
+  sh "#{LD} -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs}"
 end
 
 task :lrun_group do |t|
