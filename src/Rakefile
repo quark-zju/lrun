@@ -82,7 +82,7 @@ end
 def get_version
   @version ||= \
     begin
-      git_version = if Dir.exist?('../.git')
+      git_version = if File.exist?('../.git')
                       (`git describe --abbrev=4 --tags --always --dirty` rescue '').chomp
                     else
                       ''
