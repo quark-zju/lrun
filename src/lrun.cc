@@ -679,7 +679,8 @@ static char get_process_state(pid_t pid) {
     FILE * fstatus = fopen((string(fs::PROC_PATH) + "/" + strconv::from_longlong(pid) + "/status").c_str(), "r");
     char state = 0;
     if (!fstatus) return 0;
-    fscanf(fstatus, "%*[^\n] State: %c", &state);
+    int ret = fscanf(fstatus, "%*[^\n] State: %c", &state);
+    (void)ret;
     fclose(fstatus);
     return state;
 }
@@ -944,7 +945,8 @@ static int run_command() {
             WTERMSIG(stat),
             exceeded_limit.empty() ? "none" : exceeded_limit.c_str());
 
-    write(3, status_report, strlen(status_report));
+    int ret = write(3, status_report, strlen(status_report));
+    (void)ret;
 
     // close output earlier so the process read the status can start to do other things.
     close(3);

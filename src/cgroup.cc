@@ -804,6 +804,8 @@ static int clone_init_fn(void *) {
 }
 
 static int clone_main_fn(void * clone_arg) {
+    // kill us if parent dies
+    prctl(PR_SET_PDEATHSIG, SIGKILL);
 
     // this is executed in child process after clone
     // fs and uid settings should be done here
@@ -1021,6 +1023,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     pid_t child_pid;
     child_pid = clone(clone_main_fn, (void*)((char*)alloca(stack_size) + stack_size), clone_flags, &arg);
     char buf[4];
+    ssize_t ret;
 
     if (child_pid < 0) {
         FATAL("clone failed");
@@ -1036,23 +1039,27 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     // child is blocking, waiting us before exec, let it go
     strcpy(buf, "RUN");
     close(arg.sockets[0]);
-    send(arg.sockets[1], buf, sizeof buf, MSG_NOSIGNAL);
+    ret = send(arg.sockets[1], buf, sizeof buf, MSG_NOSIGNAL);
+    if (ret < 0) {
+        WARNING("can not send let-go message to child");
+        goto cleanup;
+    }
 
     // wait for child response
     INFO("reading from child");
 
     buf[0] = 0;
-    read(arg.sockets[1], buf, sizeof buf);
+    ret = read(arg.sockets[1], buf, sizeof buf);
 
     INFO("from child, got '%3s'", buf);
-    if (buf[0] != 'P') {
+    if (buf[0] != 'P' || ret <= 0) {  // excepting "PRE"
         // child has problem to start
         child_pid = -3;
         goto cleanup;
     }
 
     // child exec may fail, confirm
-    if (read(arg.sockets[1], buf, sizeof buf) > 0 && buf[0] == 'E') {
+    if (read(arg.sockets[1], buf, sizeof buf) > 0 && buf[0] == 'E') {  // "ERR"
         INFO("seems child exec failed");
         child_pid = -4;
     } else {
