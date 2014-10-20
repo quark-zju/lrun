@@ -25,7 +25,11 @@
 namespace sc = lrun::seccomp;
 
 #if defined(LIBSECCOMP_VERSION_MAJOR) && LIBSECCOMP_VERSION_MAJOR <= 2 && LIBSECCOMP_VERSION_MAJOR > 0
-# define LIBSECCOMP_ENABLED
+# if LIBSECCOMP_VERSION_MAJOR == 1
+#  error libseccomp 1 is no longer supported. Please upgrade to libseccomp2
+# else
+#  define LIBSECCOMP_ENABLED
+# endif
 #else
 # undef LIBSECCOMP_ENABLED
 #endif

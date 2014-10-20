@@ -9,7 +9,7 @@ h2. Dependencies
 h3. Runtime dependencies
 
 * *linux*: (>= 2.6.26 minimal, >= 3.8 recommended) you can check kernel config using @utils/check_linux_config.rb@.
-* *libseccomp*: (optionally, 1.x or 2.x) to enable syscall filtering feature.
+* *libseccomp*: (optionally, 2.x) to enable syscall filtering feature.
 
 h3. Build dependencies
 
