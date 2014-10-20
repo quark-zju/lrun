@@ -41,9 +41,9 @@ h4. Configuration
 gpasswd -a username lrun
 </pre>
 
-Prior to 0.9.7, the user must be trusted because it's possible to get a root shell using the setting. Starting from 0.9.7, lrun enforced several checks. Known methods for privilege escalations are eliminated for Linux >= 3.5. If you are using a linux kernel < 3.5, consider lrun is a privilege escalation tool.
+lrun enforced several checks and settings. If you are using the latest lrun and the kernel version is greater or equal than 3.5, the user cannot use lrun for privilege escalation. (And if the kernel version < 3.5 or lrun < 0.9.9, consider lrun a privilege escalation tool)
 
-Running @lrun@ using @sudo@ is possible but be aware of security issues. If a user can run lrun using @sudo@, consider he or she has @root@ privileges. For that reason, adding @lrun@ to @sudo@ whitelist is hardly meaningful.
+Running @lrun@ using @sudo@ is possible but be aware of security issues. If a user can run lrun using @sudo@, consider he or she has @root@ privileges. For that reason, adding @lrun@ to @sudo@ whitelist is not a good idea.
 
 h4. Build options
 
@@ -155,7 +155,7 @@ h3. Isolate processes
 2  # or 1, see Note below
 </pre>
 
-Note: starting from 0.9.6, on Linux >= 3.8, the user process won't run as pid 1. Instead, a dummy init process is spawned and the user process will run as pid 2. This avoids some potential issues because pid 1 has some special behaviors.
+On Linux >= 3.8, the user process won't run as pid 1. Instead, a dummy init process is spawned and the user process will run as pid 2. This avoids some potential issues because pid 1 has some special behaviors.
 
 h3. Change uid
 
@@ -164,7 +164,7 @@ h3. Change uid
 sudo: unknown uid 2000: who are you?
 </pre>
 
-Note: starting from 0.9.5, non-root users cannot set @--uid@ and @--gid@ and root must set @--uid@ and @--gid@.
+Non-root users cannot use @--uid@ and @--gid@ and root must provide these two options.
 
 h3. Mount tmpfs
 
@@ -187,11 +187,11 @@ TERMSIG  0
 EXCEED   none
 </pre>
 
-Note: starting from 0.9.7, non-root users can only mount A to B if he or she can read A and write B, for most cases.
+Non-root users can only mount A to B if he or she can read A and write B (except for `--tmpfs /home 0` and `--tmpfs /sys 0`).
 
 h3. Syscall filter
 
-This requires kernel >= 3.5 and libseccomp (at both compile and run time).
+This requires libseccomp >= 2.0, at both compile and run time.
 
 <pre>
 % lrun readlink /lib
