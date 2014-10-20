@@ -484,7 +484,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             config.arg.cmd_list.push_back(cmd);
         } else if (option == "help") {
             print_help();
-        } else if (option == "help-syscalls") {
+        } else if (option == "help-syscalls" && seccomp::supported()) {
             print_help("syscalls");
         } else if (option == "version") {
             print_version();
