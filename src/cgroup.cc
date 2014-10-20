@@ -990,7 +990,6 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         int pidns_fd = open(pidns_path.c_str(), O_RDONLY);
         if (pidns_fd < 0) {
             ERROR("can not open pid namespace");
-            system("bash");
             return -3;
         }
 
@@ -1042,6 +1041,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     // wait for child response
     INFO("reading from child");
 
+    buf[0] = 0;
     read(arg.sockets[1], buf, sizeof buf);
 
     INFO("from child, got '%3s'", buf);
