@@ -94,6 +94,21 @@ static int read_uint64(const char * s, uint64_t& result) {
     return len;
 }
 
+#ifndef NDEBUG
+static const char *get_scmp_action_name(uint32_t action) {
+    switch (action) {
+        case SCMP_ACT_KILL:
+            return "KILL";
+        case SCMP_ACT_ERRNO(EPERM):
+            return "EPERM";
+        case SCMP_ACT_ALLOW:
+            return "ALLOW";
+        default:
+            return "UNKNOWN";
+    }
+}
+#endif
+
 static const int execve_no = SCMP_SYS(execve);
 
 int sc::Rules::add_simple_filter(const char * const filter) {
@@ -163,7 +178,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
                 if (no == __NR_SCMP_ERROR) {
                     WARNING("Skip unresolved syscall name: '%s'", current_syscall_name.c_str());
                 } else {
-                    INFO("seccomp rule for syscall '%s' (%d): %u args", current_syscall_name.c_str(), no, (unsigned)current_arg_array.size());
+                    INFO("seccomp rule for syscall '%s' (%d): %u args, %s", current_syscall_name.c_str(), no, (unsigned)current_arg_array.size(), get_scmp_action_name(current_action));
                     int ret;
                     ret = seccomp_syscall_priority(ctx, no, priority);
                     if (ret) {
@@ -174,9 +189,9 @@ int sc::Rules::add_simple_filter(const char * const filter) {
                     // the special case: execve
                     if (no == execve_no && execve_arg1_) {
                         execve_handled = true;
-                        if (scmp_action_ != SCMP_ACT_ALLOW && current_action != SCMP_ACT_ALLOW && current_arg_array.empty()) {
+                        if (scmp_action_ == SCMP_ACT_ALLOW && current_action != SCMP_ACT_ALLOW && current_arg_array.empty()) {
                             // the user is trying to add execve to a blacklist
-                            // remove our execve from blacklist
+                            // remove our execve from the condition
                             current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_NE, execve_arg1_));
                         } else if (!current_arg_array.empty() || current_action != SCMP_ACT_ALLOW) {
                             WARNING("can not guarntee execve by lrun is allowed");
@@ -247,7 +262,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
     }
 
     if (!execve_handled && scmp_action_ != SCMP_ACT_ALLOW && execve_arg1_) {
-        // a whitelist with no execve yet, add ours
+        // a whitelist with no execve yet, add execve that only allows ours call
         reset_syscall_rule;
         current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_EQ, execve_arg1_));
         int ret = seccomp_rule_add_array(ctx, SCMP_ACT_ALLOW, execve_no, current_arg_array.size(), current_arg_array.data());

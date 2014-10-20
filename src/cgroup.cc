@@ -854,11 +854,11 @@ static int clone_main_fn(void * clone_arg) {
         return -1;
     }
 
+    // exec target
+    INFO("will execvp %s ...", arg.args[0]);
+
     do_set_new_privs(arg);
     do_seccomp(arg);
-
-    // exec target
-    INFO("execvp %s ...", arg.args[0]);
 
     execvp(arg.args[0], arg.args);
 

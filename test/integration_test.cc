@@ -34,11 +34,15 @@ using std::string;
 
 
 inline void test_c_code(string code,  string expect, string lrun_flags = "") {
-    FILE* fp = fopen(TMP_C, "w");
-    assert(fp);
-    fprintf(fp, "%s", code.c_str());
-    fclose(fp);
-    assert(system("gcc " TMP_C " -o " TMP_EXE " >/dev/null 2>/dev/null") == 0);
+    FILE *fp = fopen(TMP_C, "w");
+    static string last_code;
+    if (last_code.empty() || last_code != code) {
+        assert(fp);
+        fprintf(fp, "%s", code.c_str());
+        fclose(fp);
+        assert(system("gcc " TMP_C " -o " TMP_EXE " >/dev/null 2>/dev/null") == 0);
+        last_code = code;
+    }
     string cmd = string("lrun ") + lrun_flags + " -- " TMP_EXE " 3>&1 1>/dev/null 2>/dev/null";
     fp = popen(cmd.c_str(), "r");
     assert(fp);
@@ -50,7 +54,7 @@ inline void test_c_code(string code,  string expect, string lrun_flags = "") {
         result += buf;
     }
     pclose(fp);
-    CHECK(result.find(expect) != string::npos, 4, "code, result, expect, flags:", code.c_str(), result.c_str(), expect.c_str(), lrun_flags.c_str());
+    CHECK(result.find(expect) != string::npos, 5, "code, result, expect, flags:", code.c_str(), result.c_str(), expect.c_str(), lrun_flags.c_str());
 }
 
 void test_cmd(string cmd, string expect, string lrun_flags = "") {
@@ -65,7 +69,7 @@ void test_cmd(string cmd, string expect, string lrun_flags = "") {
         result += buf;
     }
     pclose(fp);
-    CHECK(result.find(expect) != string::npos, 4, "cmd, result, expect, flags:", cmd.c_str(), result.c_str(), expect.c_str(), lrun_flags.c_str());
+    CHECK(result.find(expect) != string::npos, 5, "cmd, result, expect, flags:", cmd.c_str(), result.c_str(), expect.c_str(), lrun_flags.c_str());
 }
 
 
@@ -126,4 +130,19 @@ TESTCASE(bad_progs) {
                     "EXCEED   MEMORY",
                     c.flag);
     }
+}
+
+TESTCASE(syscall_filter) {
+    string create_userns_code =
+            "#define _GNU_SOURCE\n#include<sched.h>\n#include<stdio.h>\nint foo(void* a){return 0;}\n"
+            "main(a){char stack[8192];a=clone(foo, stack + sizeof(stack), CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWIPC, 0);exit(a>0?0:1);}";
+    test_c_code(create_userns_code, "EXITCODE 0");
+    test_c_code(create_userns_code, "EXITCODE 1", "--syscalls '!clone[a&268435456==268435456]'");
+    test_c_code(create_userns_code, "SIGNALED 1", "--syscalls '!clone[a&268435456==268435456]:k'");
+
+    // test execve special case handling
+    test_cmd("true", "EXITCODE 0", "--syscalls '!execve'");
+    test_cmd("true", "EXITCODE 0", "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,read,exit'");
+    test_cmd("env true", "EXITCODE 1" /* 126 */, "--syscalls '!execve'");
+    test_cmd("env true", "EXITCODE 1" /* 125 */, "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,read,exit'");
 }

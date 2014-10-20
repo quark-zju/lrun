@@ -140,6 +140,7 @@ static void print_help(const string& submodule = "") {
             "  ARG_OP2:      `&`: bitwise and\n"
             "  EXTRA_ACTION: `k` is to kill, `e` is to return EPERM, `a` is to allow\n"
             "  SYSCALL_NAME: syscall name or syscall number, ex: `read`, `0`, ...\n"
+            "  NUMBER:       a decimal number containing only `0` to `9`\n"
             "\n"
             , width, 16);
         content += line_wrap(
@@ -150,7 +151,7 @@ static void print_help(const string& submodule = "") {
             "    Disallow write to fd 2 (stderr)\n"
             "  --syscalls '!sethostname:k'\n"
             "    Whoever calls sethostname will get killed\n"
-            "  --syscalls '!clone[c&268435456==268435456]'\n"
+            "  --syscalls '!clone[a&268435456==268435456]'\n"
             "    Do not allow a new user namespace to be created (CLONE_NEWUSER = 0x10000000)\n"
             , width, 4);
     } else {
