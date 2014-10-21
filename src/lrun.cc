@@ -106,7 +106,7 @@ static string line_wrap(const string& content, size_t width, int indent, const s
 }
 
 static void print_help(const string& submodule = "") {
-    size_t width = isatty(2) ? (get_terminal_width() - 1) : -1;
+    int width = isatty(2) ? (get_terminal_width() - 1) : -1;
     const int MIN_WIDTH = 60;
     if (width < MIN_WIDTH) width = MIN_WIDTH;
     string content;
