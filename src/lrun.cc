@@ -542,6 +542,21 @@ static void check_path_permission(const string& path, std::vector<string>& error
     }
 }
 
+static string follow_binds(const std::vector<std::pair<string, string> >& binds, const string& path) {
+    // only handle absolute paths
+    if (!fs::is_absolute(path)) return path;
+    string result = fs::expand(path);
+    for (int i = binds.size() - 1; i >= 0; --i) {
+        string prefix = binds[i].first + "/";
+        if (result.substr(0, prefix.length()) == prefix) {
+            // once is enough, because binds[i].second already followed previous binds
+            result = binds[i].second + result.substr(prefix.length() - 1);
+            break;
+        }
+    }
+    return result;
+}
+
 static void check_config() {
     int is_root = (getuid() == 0);
     std::vector<string> error_messages;
@@ -581,30 +596,40 @@ static void check_config() {
                     "For security reason, `--group` requires root.");
         }
 
-        // require absolute paths and r/w/x permissions
-        string chroot_path = config.arg.chroot_path;
-        if (!chroot_path.empty()) {
-            check_path_permission(chroot_path, error_messages);
-        }
-        if (!config.arg.chdir_path.empty()) {
-            string chdir_path = fs::join(chroot_path, config.arg.chdir_path);
-            check_path_permission(chdir_path, error_messages);
-        }
+        // check paths, require absolute paths and r/w/x permissions
+        // check --bindfs
+        std::vector<std::pair<string, string> > binds;
         FOR_EACH(p, config.arg.bindfs_list) {
             const string& dest = p.first;
             const string& src = p.second;
-            check_path_permission(dest, error_messages, R_OK | W_OK);
-            check_path_permission(src, error_messages);
+            check_path_permission(follow_binds(binds, dest), error_messages, R_OK | W_OK);
+            check_path_permission(follow_binds(binds, src), error_messages);
+            binds.push_back(make_pair(fs::expand(dest), follow_binds(binds, fs::expand(src))));
         }
+
+        // check --chroot
+        string chroot_path = config.arg.chroot_path;
+        if (!chroot_path.empty()) {
+            check_path_permission(follow_binds(binds, chroot_path), error_messages);
+        }
+
+        // check --chdir
+        if (!config.arg.chdir_path.empty()) {
+            string chdir_path = fs::join(chroot_path, config.arg.chdir_path);
+            check_path_permission(follow_binds(binds, chdir_path), error_messages);
+        }
+
+        // check --tmpfs
         FOR_EACH(p, config.arg.tmpfs_list) {
-            string dest = fs::join(chroot_path, p.first);
+            string dest = follow_binds(binds, fs::join(chroot_path, p.first));
             // allow read-only tmpfs mount on some paths
             // (useful to deny access to a subtree)
             if (p.second == 0) {
                 if (dest == "/home" || dest == "/sys") continue;
             }
-            check_path_permission(dest, error_messages, R_OK | W_OK);
+            check_path_permission(follow_binds(binds, dest), error_messages, R_OK | W_OK);
         }
+
         // restrict --remount-ro, only allows dst in --bindfs
         // because something like `--remount-ro /` affects outside world
         FOR_EACH(p, config.arg.remount_list) {
