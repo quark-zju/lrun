@@ -885,6 +885,7 @@ static int is_setns_pidns_supported() {
     return 1;
 }
 
+#ifndef NDEBUG
 static string clone_flags_to_str(int clone_flags) {
     int v = clone_flags;
     string s;
@@ -955,6 +956,7 @@ static string clone_flags_to_str(int clone_flags) {
     }
     return s;
 }
+#endif
 
 pid_t Cgroup::spawn(spawn_arg& arg) {
     // uid and gid should > 0
