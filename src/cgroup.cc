@@ -555,7 +555,7 @@ static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
     close(arg.sockets[1]);
     list<int> fds = get_fds();
     FOR_EACH(fd, fds) {
-        if (fd > 2 && fd != arg.sockets[0] && arg.keep_fds.count(fd) == 0) {
+        if (fd != STDERR_FILENO && fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != arg.sockets[0] && arg.keep_fds.count(fd) == 0) {
             close(fd);
         }
     }
