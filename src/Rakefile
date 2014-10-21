@@ -48,7 +48,7 @@ end
 def executable_exists?(name)
   # only interested in first word in name
   name = name.split.first
-  path = which(name, ENV['PATH'])
+  path = which(name, ENV['PATH'] + ':/')
   path && File.executable?(path) ? true : false
 end
 

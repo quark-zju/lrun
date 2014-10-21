@@ -73,6 +73,8 @@ static int get_terminal_width() {
 }
 
 static string line_wrap(const string& content, size_t width, int indent, const string& join = "") {
+    if (width <= 0) return content;
+
     string result;
     int line_size = 0;
     for (size_t i = 0; i < content.length(); ++i) {
@@ -108,7 +110,7 @@ static string line_wrap(const string& content, size_t width, int indent, const s
 static void print_help(const string& submodule = "") {
     int width = isatty(2) ? (get_terminal_width() - 1) : -1;
     const int MIN_WIDTH = 60;
-    if (width < MIN_WIDTH) width = MIN_WIDTH;
+    if (width < MIN_WIDTH && width >= 0) width = MIN_WIDTH;
     string content;
 
     if (submodule == "syscalls") {
@@ -790,7 +792,6 @@ static int run_command() {
 
     // spawn child
     pid_t pid = 0;
-    bool running = true;
 
     int& clone_flags = config.arg.clone_flags;
     if (!config.enable_network) clone_flags |= CLONE_NEWNET;
@@ -819,7 +820,7 @@ static int run_command() {
     // which limit exceed
     string exceeded_limit = "";
 
-    while (running) {
+    for (bool running = true; running;) {
         // check signal
         if (signal_triggered) {
             fprintf(stderr, "Receive signal %d, exiting...\n", signal_triggered);
@@ -834,7 +835,6 @@ static int run_command() {
             // stat available
             if (WIFEXITED(stat) || WIFSIGNALED(stat)) {
                 INFO("child exited");
-                running = false;
                 break;
             }
         } else if (e == -1) {
