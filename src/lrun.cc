@@ -124,7 +124,7 @@ static void print_help(const string& submodule = "") {
             , width, 2);
         content += line_wrap(
             "Format:\n"
-            "  FILTER_STRING  := SYSCALL_RULE | STRING_FILTER + ',' + SYSCALL_RULE\n"
+            "  FILTER_STRING  := SYSCALL_RULE | FILTER_STRING + ',' + SYSCALL_RULE\n"
             "  SYSCALL_RULE   := SYSCALL_NAME + EXTRA_ARG_RULE + EXTRA_ACTION\n"
             "  EXTRA_ARG_RULE := '' | '[' + ARG_RULES + ']'\n"
             "  ARG_RULES      := ARG_RULE | ARG_RULES + ',' + ARG_RULE\n"
