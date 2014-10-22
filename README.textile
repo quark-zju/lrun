@@ -187,7 +187,7 @@ TERMSIG  0
 EXCEED   none
 </pre>
 
-Non-root users can only mount A to B if he or she can read A and write B (except for `--tmpfs /home 0` and `--tmpfs /sys 0`).
+There is also @--bindfs@. Non-root users can only mount A to B if he or she can read A.
 
 h3. Syscall filter
 

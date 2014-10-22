@@ -205,7 +205,7 @@ static void print_help(const string& submodule = "") {
             "  --version                     Show version information\n"
             "\n"
             "Options that could be used multiple times:\n"
-            "  --bindfs          dst src     Bind `src` to `dst`. This is performed before chroot. You should have read permission on `src` and write permission on `dst`\n"
+            "  --bindfs          dst src     Bind `src` to `dst`. This is performed before chroot. You should have read permission on `src`\n"
             "  --remount-ro      dst         Remount `dst` make it read-only. This is performed before bindfs. Non-root users can only use this on `dst`s specified in `--bindfs`\n"
             "  --tmpfs           path bytes  Mount writable tmpfs to specified `path` to hide filesystem subtree. `size` is in bytes. If it is 0, mount read-only."
             " This is performed after chroot. You should have write permission on `path`\n"
@@ -596,13 +596,12 @@ static void check_config() {
                     "For security reason, `--group` requires root.");
         }
 
-        // check paths, require absolute paths and r/w/x permissions
+        // check paths, require absolute paths and read permissions
         // check --bindfs
         std::vector<std::pair<string, string> > binds;
         FOR_EACH(p, config.arg.bindfs_list) {
             const string& dest = p.first;
             const string& src = p.second;
-            check_path_permission(follow_binds(binds, dest), error_messages, R_OK | W_OK);
             check_path_permission(follow_binds(binds, src), error_messages);
             binds.push_back(make_pair(fs::expand(dest), follow_binds(binds, fs::expand(src))));
         }
@@ -617,17 +616,6 @@ static void check_config() {
         if (!config.arg.chdir_path.empty()) {
             string chdir_path = fs::join(chroot_path, config.arg.chdir_path);
             check_path_permission(follow_binds(binds, chdir_path), error_messages);
-        }
-
-        // check --tmpfs
-        FOR_EACH(p, config.arg.tmpfs_list) {
-            string dest = follow_binds(binds, fs::join(chroot_path, p.first));
-            // allow read-only tmpfs mount on some paths
-            // (useful to deny access to a subtree)
-            if (p.second == 0) {
-                if (dest == "/home" || dest == "/sys") continue;
-            }
-            check_path_permission(follow_binds(binds, dest), error_messages, R_OK | W_OK);
         }
 
         // restrict --remount-ro, only allows dst in --bindfs
