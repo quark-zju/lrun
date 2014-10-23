@@ -711,8 +711,9 @@ static void signal_handler(int signal) {
 static struct LibSegFaultLoader {
     LibSegFaultLoader() {
         // try to load libSegFault.so
+        // use `addr2line` if libSegFault doesn't resolve function names
         void *libSegFault = dlopen("libSegFault.so", RTLD_NOW);
-        // debug variable may not be initialized now, do not write logs
+        // log facility may not be initialized now, do not use INFO here
         (void)libSegFault;
     }
 } _libSegFaultLoader;

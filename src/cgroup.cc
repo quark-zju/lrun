@@ -201,10 +201,12 @@ void Cgroup::update_output_count() {
         long long bytes = 0;
         sscanf(spid, "%ld", &pid);
         FILE * io = fopen((string(fs::PROC_PATH) + "/" + spid + "/io").c_str(), "r");
+        if (!io) continue;
         int res = 0;
         res = fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
-        (void)res;
-        if (output_counter_[pid] < bytes) output_counter_[pid] = bytes;
+        if (res == 1) {
+            if (output_counter_[pid] < bytes) output_counter_[pid] = bytes;
+        }
         fclose(io);
     }
     fclose(procs);
