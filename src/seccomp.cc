@@ -176,7 +176,9 @@ int sc::Rules::add_simple_filter(const char * const filter) {
                     no = seccomp_syscall_resolve_name(current_syscall_name.c_str());
                 }
                 if (no == __NR_SCMP_ERROR) {
-                    WARNING("Skip unresolved syscall name: '%s'", current_syscall_name.c_str());
+                    WARNING("skip unresolved syscall '%s'", current_syscall_name.c_str());
+                } else if (scmp_action_ == current_action) {
+                    INFO("ignore meaningless rule for syscall '%s'", current_syscall_name.c_str());
                 } else {
                     INFO("seccomp rule for syscall '%s' (%d): %u args, %s", current_syscall_name.c_str(), no, (unsigned)current_arg_array.size(), get_scmp_action_name(current_action));
                     int ret;
@@ -189,7 +191,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
                     // the special case: execve
                     if (no == execve_no && execve_arg1_) {
                         execve_handled = true;
-                        if (scmp_action_ == SCMP_ACT_ALLOW && current_action != SCMP_ACT_ALLOW && current_arg_array.empty()) {
+                        if (scmp_action_ /* default action */ == SCMP_ACT_ALLOW && current_action != SCMP_ACT_ALLOW && current_arg_array.empty()) {
                             // the user is trying to add execve to a blacklist
                             // remove our execve from the condition
                             current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_NE, execve_arg1_));
