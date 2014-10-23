@@ -705,6 +705,19 @@ static void signal_handler(int signal) {
     signal_triggered = signal;
 }
 
+#ifndef NDEBUG
+// compile with -ldl
+#include <dlfcn.h>
+static struct LibSegFaultLoader {
+    LibSegFaultLoader() {
+        // try to load libSegFault.so
+        void *libSegFault = dlopen("libSegFault.so", RTLD_NOW);
+        // debug variable may not be initialized now, do not write logs
+        (void)libSegFault;
+    }
+} _libSegFaultLoader;
+#endif
+
 static void setup_signal_handlers() {
     struct sigaction action;
 

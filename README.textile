@@ -52,7 +52,6 @@ There are several environment variables which can affect building process:
 * *PREFIX*: Install destination. Default is @/usr/local@.
 * *CXX*: The C++ compiler. For example, @clang++@ or @g++@
 * *CXXFLAGS*: Flags used for C++ compiler. Default is @-O2 -Wall@
-* *LD*: The linker. Default is the same as @CXX@.
 * *INSTALL*: @install@ binary.
 * *LRUN_GROUP*: The group which have access to run lrun directly. Default is @lrun@.
 * *NDEBUG*: If set, remove some debug code and produce smaller executable.

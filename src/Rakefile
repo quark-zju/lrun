@@ -5,7 +5,7 @@ OBJ          = SRC.ext('o')
 BIN          = 'lrun'
 CXX          = ENV['CXX'] || 'g++'
 CXXFLAGS     = ENV['CXXFLAGS'] || '-Os -Wall -Wwrite-strings -Wunused-result -pipe'
-LD           = ENV['LD'] || CXX
+LD           = CXX
 PREFIX       = ENV['PREFIX'] || '/usr/local'
 INSTALL      = ENV['INSTALL'] || 'install'
 SUDO         = ENV['SUDO'] || 'sudo'
@@ -13,7 +13,7 @@ LRUN_GROUP   = ENV['LRUN_GROUP'] || 'lrun'
 LRUN_GID     = ENV['LRUN_GID'] || '593'
 TMP_DIR      = ENV['TMP'] || ENV['TEMP'] || '/tmp'
 NULL         = ENV['NULL'] || '/dev/null'
-NODEBUG_FLAG = ENV['NDEBUG'] ? '-DNDEBUG' : ''
+NODEBUG_FLAG = ENV['NDEBUG'] ? '-DNDEBUG' : '-g'
 GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 NOSECCOMP    = ENV['NOSECCOMP']
 
@@ -112,6 +112,10 @@ def get_libseccomp_libs
   end
 end
 
+def get_other_libs
+  ENV['NDEBUG'] ? '' : '-ldl'
+end
+
 def get_libseccomp_cflags
   case get_libseccomp_version
   when 0
@@ -151,7 +155,7 @@ end
 
 file BIN => OBJ do |t|
   require_executable! LD
-  sh "#{LD} -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs}"
+  sh "#{LD} -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs} #{get_other_libs}"
 end
 
 task :lrun_group do |t|
@@ -164,5 +168,7 @@ end
 
 task :install => [BIN, :lrun_group] do |t|
   require_executable! INSTALL
-  root_sh "#{INSTALL} -D -m4550 -oroot -g#{LRUN_GROUP} -s #{BIN} #{ENV['DESTDIR']}#{PREFIX}/bin/lrun"
+  install_flags = "-D -m4550 -oroot -g#{LRUN_GROUP}"
+  install_flags << ' -s' if ENV['NDEBUG']
+  root_sh "#{INSTALL} #{install_flags} #{BIN} #{ENV['DESTDIR']}#{PREFIX}/bin/lrun"
 end
