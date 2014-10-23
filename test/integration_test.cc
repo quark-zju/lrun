@@ -130,6 +130,11 @@ TESTCASE(bad_progs) {
                     "EXCEED   MEMORY",
                     c.flag);
     }
+    for_each_flag("--max-output 1280000") {
+        test_c_code("char c[8000];main(i){for(i=0;i<sizeof(c)-1;++i)c[i]='a';while(1)puts(c);}",
+                    "EXCEED   OUTPUT",
+                    c.flag);
+    }
 }
 
 TESTCASE(syscall_filter) {
