@@ -726,7 +726,8 @@ static void setup_signal_handlers() {
     action.sa_flags = 0;
     action.sa_handler = SIG_IGN;
 
-    // ignore SIGPIPE
+    // ignore SIGPIPE so that a program reading fd 3 via a pipe may
+    // close it earlier and lrun continues to do cleaning work
     sigaction(SIGPIPE, &action, NULL);
     sigaction(SIGALRM, &action, NULL);
 
