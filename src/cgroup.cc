@@ -68,7 +68,7 @@ static struct {
 std::string Cgroup::subsys_base_paths_[sizeof(subsys_names) / sizeof(subsys_names[0])];
 
 int Cgroup::subsys_id_from_name(const char * const name) {
-    for (size_t i = 0; i < sizeof(subsys_names) / sizeof(subsys_names[0]); ++i) {
+    for (size_t i = 0; i < sizeof(Cgroup::subsys_names) / sizeof(Cgroup::subsys_names[0]); ++i) {
         if (strcmp(name, subsys_names[i])) return i;
     }
     return -1;

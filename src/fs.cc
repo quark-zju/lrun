@@ -123,8 +123,15 @@ string fs::resolve(const string& path, const string& work_dir) {
                 goto cleanup;
             } else if ((size_t) out_size >= buf_size) {
                 // try bigger
-                buf_size += PATH_MAX;
-                buf = (char*) realloc(buf, buf_size + 1);
+                char *new_buf = (char*) realloc(buf, buf_size + PATH_MAX + 1);
+                if (new_buf) {
+                    buf = new_buf;
+                    buf_size += PATH_MAX;
+                } else {
+                    // give up
+                    result = buf;
+                    break;
+                }
             } else {
                 buf[out_size] = 0;
                 link = result = buf;
