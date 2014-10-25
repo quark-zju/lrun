@@ -434,7 +434,7 @@ static void do_remounts(const Cgroup::spawn_arg& arg) {
         unsigned long flags = p.second;
         // tricky point: if the original mount point has --bind, remount with --bind
         // can make it less likely to get "device busy" message
-        if (arg.bindfs_list.count(dest)) flags |= MS_BIND;
+        if (arg.bindfs_dest_set.count(dest)) flags |= MS_BIND;
 
         INFO("remount %s", dest.c_str());
         for (;;) {

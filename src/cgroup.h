@@ -264,8 +264,10 @@ namespace lrun {
                                             // syscall default action
                 std::list<std::pair<std::string, long long> > tmpfs_list;
                                             // [(dest, bytes)] mount tmpfs in child FS (after chroot)
-                std::map<std::string, std::string> bindfs_list;
+                std::list<std::pair<std::string, std::string> > bindfs_list;
+                std::set<std::string> bindfs_dest_set;
                                             // [(dest, src)] mount bind in child FS (before chroot)
+                                            // bindfs_dests is for quickly lookup purpose
                 std::map<std::string, unsigned long> remount_list;
                                             // [(dest, flags)] remount list (before chroot)
                 std::list<std::string> cmd_list;
