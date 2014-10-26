@@ -292,22 +292,27 @@ namespace lrun {
              */
             pid_t spawn(spawn_arg& arg);
 
+            /**
+             * umount ext proc if it is mounted
+             * @return   1           successful
+             *           0           error
+             */
+            bool umount_ext_proc();
+
         private:
 
             Cgroup();
 
-            /**
-             * cgroup directory name
-             */
             std::string name_;
+            std::string ext_proc_mount_path_;
 
             /**
-             * count output bytes
+             * count output bytes. keys are pid
              */
             std::map<long, long long> output_counter_;
 
             /**
-             * cached init pid (only valid if pid namespace is enabled)
+             * init pid (only valid if pid namespace is enabled)
              */
             pid_t init_pid_;
 

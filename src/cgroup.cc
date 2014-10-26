@@ -311,8 +311,36 @@ void Cgroup::killall() {
     return;
 }
 
+bool Cgroup::umount_ext_proc() {
+    int e = 0;
+    if (ext_proc_mount_path_.empty()) return true;
+
+    do {
+        INFO("umounting %s", ext_proc_mount_path_.c_str());
+        e = umount2(ext_proc_mount_path_.c_str(), MNT_DETACH);
+        if (e == -1) {
+            ERROR("failed to umount %s", ext_proc_mount_path_.c_str());
+            break;
+        }
+        e = rmdir(ext_proc_mount_path_.c_str());
+        if (e == -1) {
+            ERROR("failed to rmdir %s", ext_proc_mount_path_.c_str());
+            break;
+        }
+        string dir = fs::expand(fs::join(ext_proc_mount_path_, ".."));
+        e = rmdir(dir.c_str());
+        if (e == -1) {
+            ERROR("failed to rmdir %s", dir.c_str());
+            break;
+        }
+        ext_proc_mount_path_ = "";
+    } while (0);
+    return e == 0;
+}
+
 int Cgroup::destroy() {
     killall();
+    umount_ext_proc();
 
     int ret = 0;
     for (int id = 0; id < SUBSYS_COUNT; ++id) {
@@ -500,10 +528,9 @@ static void do_mount_proc(const Cgroup::spawn_arg& arg) {
 static void do_mount_ext_proc(const Cgroup::spawn_arg& arg) {
     const string& path = arg.ext_proc_path;
     if (path.empty()) return;
-    // parepare the directory
     fs::mkdir_p(path, 0555);
-    INFO("mount procfs to %s", path.c_str())
-    if (mount("lrun_ext_proc", path.c_str(), "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
+    INFO("mount procfs to %s", path.c_str());
+    if (mount("lrun_ext_proc", path.c_str(), "proc", MS_NOEXEC | MS_NOSUID, "hidepid=2")) {
         FATAL("mount procfs to %s failed", path.c_str());
     }
 }
@@ -999,6 +1026,9 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         WARNING("uid and gid can not <= 0. spawn rejected");
         return -2;
     }
+
+    // set ext proc path
+    if (!arg.ext_proc_path.empty()) ext_proc_mount_path_ = arg.ext_proc_path;
 
     // stack size for cloned processes
     long stack_size = sysconf(_SC_PAGESIZE);

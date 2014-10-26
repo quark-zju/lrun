@@ -697,6 +697,7 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
         if (cg.destroy()) WARNING("can not destroy cgroup");
     } else {
         cg.killall();
+        cg.umount_ext_proc();
     }
 
     exit(exit_code);
