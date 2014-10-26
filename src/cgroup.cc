@@ -23,6 +23,7 @@
 #include "cgroup.h"
 #include "fs.h"
 #include "strconv.h"
+#include "init.h"
 #include <cstdio>
 #include <cstring>
 #include <list>
@@ -311,6 +312,10 @@ void Cgroup::killall() {
     return;
 }
 
+static string get_pid_translate_server_path(const string& ext_proc_path) {
+    return fs::expand(fs::join(ext_proc_path, "../pid-translate.sock"));
+}
+
 bool Cgroup::umount_ext_proc() {
     int e = 0;
     if (ext_proc_mount_path_.empty()) return true;
@@ -327,6 +332,11 @@ bool Cgroup::umount_ext_proc() {
             ERROR("failed to rmdir %s", ext_proc_mount_path_.c_str());
             break;
         }
+        string sock_path = get_pid_translate_server_path(ext_proc_mount_path_);
+        if (fs::is_accessible(sock_path, F_OK)) {
+            remove(sock_path.c_str());
+        }
+
         string dir = fs::expand(fs::join(ext_proc_mount_path_, ".."));
         e = rmdir(dir.c_str());
         if (e == -1) {
@@ -823,44 +833,24 @@ static void do_set_new_privs(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void init_signal_handler(int signal) {
-    if (signal == SIGCHLD) {
-        int status;
-        while (waitpid(-1, &status, WNOHANG) > 0);
-    } else {
-        exit(1);
-    }
-}
-
-static int clone_init_fn(void *) {
+static int clone_init_fn(void *clone_arg) {
     // a dummy init process in new pid namespace
     // intended to be killed via SIGKILL from root pid namespace
     prctl(PR_SET_PDEATHSIG, SIGHUP);
 
-    {
-        struct sigaction action;
-        action.sa_handler = init_signal_handler;
-        sigemptyset(&action.sa_mask);
-        action.sa_flags = 0;
-        sigaction(SIGKILL, &action, NULL);
-        sigaction(SIGHUP, &action, NULL);
-        sigaction(SIGINT, &action, NULL);
-        sigaction(SIGTERM, &action, NULL);
-        sigaction(SIGABRT, &action, NULL);
-        sigaction(SIGQUIT, &action, NULL);
-        sigaction(SIGPIPE, &action, NULL);
-        sigaction(SIGALRM, &action, NULL);
-        sigaction(SIGCHLD, &action, NULL);
+    init::register_signal_handlers();
+
+    Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
+    if (!arg.ext_proc_path.empty()) {
+        string path = get_pid_translate_server_path(arg.ext_proc_path);
+        init::start_pid_translate_server(path);
     }
 
-    // close all fds
-    {
-        list<int> fds = get_fds();
-        INFO("init is running");
-        FOR_EACH(fd, fds) close(fd);
-    }
-
+    INFO("init enters sleep mode");
+    list<int> fds = get_fds();
+    FOR_EACH(fd, fds) close(fd);
     while (1) pause();
+
     return 0;
 }
 
@@ -1028,7 +1018,10 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     }
 
     // set ext proc path
-    if (!arg.ext_proc_path.empty()) ext_proc_mount_path_ = arg.ext_proc_path;
+    if (!arg.ext_proc_path.empty()) {
+        ext_proc_mount_path_ = arg.ext_proc_path;
+        fs::mkdir_p(arg.ext_proc_path, 0555);
+    }
 
     // stack size for cloned processes
     long stack_size = sysconf(_SC_PAGESIZE);
@@ -1046,7 +1039,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         // create a dummy init process in a new namespace
         // CLONE_PTRACE: prevent the process being traced by another process
         INFO("spawning dummy init process");
-        int init_clone_flags = CLONE_NEWPID | CLONE_PTRACE;
+        int init_clone_flags = CLONE_NEWPID;
         init_pid_ = clone(clone_init_fn, (void*)((char*)alloca(stack_size) + stack_size), init_clone_flags, &arg);
         if (init_pid_ < 0) {
             ERROR("can not spawn init process");
