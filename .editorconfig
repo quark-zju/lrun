@@ -16,3 +16,6 @@ indent_size = 2
 
 [Rakefile]
 indent_size = 2
+
+[Makefile]
+indent_style = tab

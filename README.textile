@@ -2,7 +2,7 @@ h1. lrun
 
 !https://api.travis-ci.org/quark-zju/lrun.png!:https://travis-ci.org/quark-zju/lrun
 
-Run program on Linux with resources limited.
+Run programs on Linux with resources (ex. time, memory, network, device, syscall, etc.) limited.
 
 h2. Dependencies
 
@@ -29,8 +29,7 @@ h2. Installation
 h3. Build from source
 
 <pre>
-cd src
-rake install
+make install  # or: cd src && rake install
 </pre>
 
 h4. Configuration
