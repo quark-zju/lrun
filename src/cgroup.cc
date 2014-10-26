@@ -470,24 +470,56 @@ static void do_chroot(const Cgroup::spawn_arg& arg) {
     }
 }
 
+static bool should_mount_proc(const Cgroup::spawn_arg& arg) {
+    if (!arg.ext_proc_path.empty()) return false;
+    if ((arg.clone_flags & CLONE_NEWPID) == 0 || !fs::is_dir(fs::PROC_PATH)) return false;
+    return true;
+}
+
+static bool should_hide_sensitive(const Cgroup::spawn_arg& arg) {
+    // currently there is no option about this behavior
+    // assume that --no-new-privs false users do not like this
+    if (!arg.ext_proc_path.empty()) return false;  // probably filterefs will handle the task
+    if (!arg.no_new_privs) return false;
+    if (getenv("LRUN_DO_NOT_HIDE_SENSITIVE")) return false;
+    return true;
+}
+
 static void do_mount_proc(const Cgroup::spawn_arg& arg) {
-    // mount /proc if pid namespace is enabled
-    if ((arg.clone_flags & CLONE_NEWPID) && fs::is_dir("/proc")) {
-        INFO("mount /proc");
-        if (mount(NULL, "/proc", "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
-            FATAL("mount procfs failed");
-        }
+    // mount /proc if pid namespace is enabled, and we haven't mount it
+    // in an external path
+    if (!should_mount_proc(arg)) return;
+    INFO("mount procfs");
+    const char *mount_opts = NULL;
+    if (should_hide_sensitive(arg)) mount_opts = "hidepid=2";
+    if (mount("lrun_proc", fs::PROC_PATH, "proc", MS_NOEXEC | MS_NOSUID, mount_opts)) {
+        FATAL("mount procfs failed");
+    }
+}
+
+static void do_mount_ext_proc(const Cgroup::spawn_arg& arg) {
+    const string& path = arg.ext_proc_path;
+    if (path.empty()) return;
+    // parepare the directory
+    fs::mkdir_p(path, 0555);
+    INFO("mount procfs to %s", path.c_str())
+    if (mount("lrun_ext_proc", path.c_str(), "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
+        FATAL("mount procfs to %s failed", path.c_str());
     }
 }
 
 static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
     // currently there is no option about this behavior
     // assume that --no-new-privs false users do not like this
-    if (arg.no_new_privs) {
-        if ((arg.clone_flags & CLONE_NEWPID) && getpid() != 1) {
-            mount(NULL, "/proc/1", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
-        }
-        mount(NULL, "/proc/sys", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+    if (!should_hide_sensitive(arg)) return;
+
+    list<string> hide_paths;
+    hide_paths.push_back(fs::join(fs::PROC_PATH, "sys"));
+
+    FOR_EACH(path, hide_paths) {
+        INFO("hiding %s", path.c_str());
+        if (!fs::is_accessible(path)) continue;
+        mount(NULL, path.c_str(), "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
     }
 }
 
@@ -819,6 +851,7 @@ static int clone_main_fn(void * clone_arg) {
     // etc.
     do_set_sysctl();
 #endif
+    do_mount_ext_proc(arg);
     do_set_uts(arg);
     do_close_high_fds(arg);
     do_privatize_filesystem(arg);

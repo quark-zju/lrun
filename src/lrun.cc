@@ -54,7 +54,7 @@ static struct {
     long long output_limit;
     bool enable_devices_whitelist;
     bool enable_network;
-    bool enable_user_proc_namespace;
+    bool enable_pidns;
     bool pass_exitcode;
     useconds_t interval;
     string cgname;
@@ -268,7 +268,7 @@ static void init_default_config() {
     config.output_limit = -1;
     config.enable_devices_whitelist = false;
     config.enable_network = true;
-    config.enable_user_proc_namespace = true;
+    config.enable_pidns = true;
     config.interval = (useconds_t)(0.02 * 1000000);
     config.active_cgroup = NULL;
     config.pass_exitcode = false;
@@ -361,7 +361,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             config.arg.rlimits[RLIMIT_STACK] = NEXT_LONG_LONG_ARG;
         } else if (option == "isolate-process") {
             REQUIRE_NARGV(1);
-            config.enable_user_proc_namespace = NEXT_BOOL_ARG;
+            config.enable_pidns = NEXT_BOOL_ARG;
         } else if (option == "basic-devices") {
             REQUIRE_NARGV(1);
             config.enable_devices_whitelist = NEXT_BOOL_ARG;
@@ -424,6 +424,9 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "cgname") {
             REQUIRE_NARGV(1);
             config.cgname = NEXT_STRING_ARG;
+        } else if (option == "mount-cg-proc") {
+            REQUIRE_NARGV(1);
+            config.arg.ext_proc_path = NEXT_STRING_ARG;
         } else if (option == "hostname") {
             REQUIRE_NARGV(1);
             config.arg.uts.nodename = NEXT_STRING_ARG;
@@ -761,6 +764,11 @@ static void create_cgroup() {
 
     if (!new_cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
     config.active_cgroup = &new_cg;
+
+    // modify ext mount path to include cgname
+    if (!config.arg.ext_proc_path.empty()) {
+        config.arg.ext_proc_path = fs::join(fs::join(config.arg.ext_proc_path, cgname), "proc");
+    }
 }
 
 static void setup_cgroup() {
@@ -831,7 +839,7 @@ static int run_command() {
 
     int& clone_flags = config.arg.clone_flags;
     if (!config.enable_network) clone_flags |= CLONE_NEWNET;
-    if (config.enable_user_proc_namespace) clone_flags |= CLONE_NEWPID | CLONE_NEWIPC;
+    if (config.enable_pidns) clone_flags |= CLONE_NEWPID | CLONE_NEWIPC;
 
     pid = cg.spawn(config.arg);
 
