@@ -26,6 +26,7 @@
 
 #include "init.h"
 #include "common.h"
+#include "fs.h"
 
 #include <netinet/in.h>
 #include <cstdio>
@@ -42,6 +43,7 @@
 
 
 using std::string;
+namespace fs = lrun::fs;
 namespace ni = lrun::init;
 
 static void init_signal_handler(int signal) {
@@ -53,42 +55,82 @@ static void init_signal_handler(int signal) {
     }
 }
 
+static string allow_prefix = "";
+
+void ni::allow_forward_read(const std::string& path) {
+    allow_prefix = path;
+}
+
+static void process_read_file_request(int cfd) {
+    long len;
+    if (allow_prefix.empty()) return;
+    if (recv(cfd, &len, sizeof len, MSG_WAITALL) != sizeof len) return;
+    if (len <= 0 || len >= 4096 /* max path len */) return;
+
+    char rpath[len];
+    if (recv(cfd, rpath, len, MSG_WAITALL) != len) return;
+    if (rpath[0] != '/') return;
+
+    string path = fs::expand(rpath);
+    if (path.substr(0, allow_prefix.length()) != allow_prefix) return;
+
+    size_t size;
+    if (recv(cfd, &size, sizeof size, MSG_WAITALL) != sizeof size) return;
+
+    off_t offset;
+    if (recv(cfd, &offset, sizeof offset, MSG_WAITALL) != sizeof offset) return;
+    if (size > 4194304) return;
+
+    int fd = open(path.c_str(), O_RDONLY);
+    if (fd == -1) return;
+    char buf[size];
+    ssize_t n = pread(fd, buf, size, offset);
+    if (send(cfd, &n, sizeof n, MSG_NOSIGNAL) == -1) return;
+    if (n > 0) send(cfd, buf, n, MSG_NOSIGNAL);
+}
+
 static void process_pid_translate_request(int cfd) {
     long pid;
-    if (recv(cfd, &pid, sizeof pid, MSG_WAITALL) == -1) return;
-    INFO("got pid: %ld\n", pid);
+    while (recv(cfd, &pid, sizeof pid, MSG_WAITALL) == sizeof pid) {
+        struct msghdr msgh;
+        struct iovec iov;
+        ssize_t ns;
 
-    struct msghdr msgh;
-    struct iovec iov;
-    ssize_t ns;
+        msgh.msg_name = NULL;
+        msgh.msg_namelen = 0;
+        msgh.msg_iov = &iov;
+        msgh.msg_iovlen = 1;
+        iov.iov_base = &pid;  // pid as dummy data
+        iov.iov_len = sizeof(pid);
 
-    msgh.msg_name = NULL;
-    msgh.msg_namelen = 0;
-    msgh.msg_iov = &iov;
-    msgh.msg_iovlen = 1;
-    iov.iov_base = &pid;  // pid as dummy data
-    iov.iov_len = sizeof(pid);
+        struct ucred *ucp;
+        union {
+            struct cmsghdr cmh;
+            char   control[CMSG_SPACE(sizeof(struct ucred))];
+        } control_un;
 
-    struct ucred *ucp;
-    union {
-        struct cmsghdr cmh;
-        char   control[CMSG_SPACE(sizeof(struct ucred))];
-    } control_un;
+        msgh.msg_control = control_un.control;
+        msgh.msg_controllen = sizeof(control_un.control);
 
-    msgh.msg_control = control_un.control;
-    msgh.msg_controllen = sizeof(control_un.control);
+        control_un.cmh.cmsg_len = CMSG_LEN(sizeof(struct ucred));
+        control_un.cmh.cmsg_level = SOL_SOCKET;
+        control_un.cmh.cmsg_type = SCM_CREDENTIALS;
 
-    control_un.cmh.cmsg_len = CMSG_LEN(sizeof(struct ucred));
-    control_un.cmh.cmsg_level = SOL_SOCKET;
-    control_un.cmh.cmsg_type = SCM_CREDENTIALS;
+        ucp = (struct ucred *) CMSG_DATA(&control_un.cmh);
+        ucp->pid = pid;
+        ucp->uid = 0;
+        ucp->gid = 0;
 
-    ucp = (struct ucred *) CMSG_DATA(&control_un.cmh);
-    ucp->pid = pid;
-    ucp->uid = 0;
-    ucp->gid = 0;
+        ns = sendmsg(cfd, &msgh, 0);
+        if (ns == -1) ERROR("sendmsg");
+    }
+}
 
-    ns = sendmsg(cfd, &msgh, 0);
-    if (ns == -1) ERROR("sendmsg");
+static void process_request(int cfd) {
+    char mode;
+    if (recv(cfd, &mode, sizeof mode, MSG_WAITALL) != sizeof mode) return;
+    if (mode == 'p') process_pid_translate_request(cfd);
+    if (mode == 'r') process_read_file_request(cfd);
 }
 
 void ni::start_pid_translate_server(const string& socket_path) {
@@ -121,7 +163,8 @@ void ni::start_pid_translate_server(const string& socket_path) {
     socklen_t cun_size = sizeof cun;
 
     while ((cfd = accept(sfd, (struct sockaddr*)&cun, &cun_size)) != -1) {
-        process_pid_translate_request(cfd);
+        process_request(cfd);
+        close(cfd);
     }
 }
 
@@ -136,7 +179,6 @@ void ni::register_signal_handlers() {
     sigaction(SIGTERM, &action, NULL);
     sigaction(SIGABRT, &action, NULL);
     sigaction(SIGQUIT, &action, NULL);
-    sigaction(SIGPIPE, &action, NULL);
     sigaction(SIGALRM, &action, NULL);
     sigaction(SIGCHLD, &action, NULL);
 }

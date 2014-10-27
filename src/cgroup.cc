@@ -510,7 +510,7 @@ static void do_chroot(const Cgroup::spawn_arg& arg) {
 
 static bool should_mount_proc(const Cgroup::spawn_arg& arg) {
     if (!arg.ext_proc_path.empty()) return false;
-    if ((arg.clone_flags & CLONE_NEWPID) == 0 || !fs::is_dir(fs::PROC_PATH)) return false;
+    if ((arg.clone_flags & CLONE_NEWPID) == 0 || !fs::is_accessible(fs::PROC_PATH, F_OK | X_OK)) return false;
     return true;
 }
 
@@ -843,6 +843,7 @@ static int clone_init_fn(void *clone_arg) {
     Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
     if (!arg.ext_proc_path.empty()) {
         string path = get_pid_translate_server_path(arg.ext_proc_path);
+        init::allow_forward_read(arg.ext_proc_path);
         init::start_pid_translate_server(path);
     }
 

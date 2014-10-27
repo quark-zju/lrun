@@ -32,5 +32,7 @@ namespace lrun {
          * never returns if no error occurs
          */
         void start_pid_translate_server(const std::string& socket_path);
+
+        void allow_forward_read(const std::string& path);
     }
 }
