@@ -424,9 +424,6 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "cgname") {
             REQUIRE_NARGV(1);
             config.cgname = NEXT_STRING_ARG;
-        } else if (option == "mount-cg-proc") {
-            REQUIRE_NARGV(1);
-            config.arg.ext_proc_path = NEXT_STRING_ARG;
         } else if (option == "hostname") {
             REQUIRE_NARGV(1);
             config.arg.uts.nodename = NEXT_STRING_ARG;
@@ -697,7 +694,6 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
         if (cg.destroy()) WARNING("can not destroy cgroup");
     } else {
         cg.killall();
-        cg.umount_ext_proc();
     }
 
     exit(exit_code);
@@ -765,11 +761,6 @@ static void create_cgroup() {
 
     if (!new_cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
     config.active_cgroup = &new_cg;
-
-    // modify ext mount path to include cgname
-    if (!config.arg.ext_proc_path.empty()) {
-        config.arg.ext_proc_path = fs::join(fs::join(config.arg.ext_proc_path, cgname), "proc");
-    }
 }
 
 static void setup_cgroup() {

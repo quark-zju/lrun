@@ -23,7 +23,6 @@
 #include "cgroup.h"
 #include "fs.h"
 #include "strconv.h"
-#include "init.h"
 #include <cstdio>
 #include <cstring>
 #include <list>
@@ -312,45 +311,8 @@ void Cgroup::killall() {
     return;
 }
 
-static string get_pid_translate_server_path(const string& ext_proc_path) {
-    return fs::expand(fs::join(ext_proc_path, "../pid-translate.sock"));
-}
-
-bool Cgroup::umount_ext_proc() {
-    int e = 0;
-    if (ext_proc_mount_path_.empty()) return true;
-
-    do {
-        INFO("umounting %s", ext_proc_mount_path_.c_str());
-        e = umount2(ext_proc_mount_path_.c_str(), MNT_DETACH);
-        if (e == -1) {
-            ERROR("failed to umount %s", ext_proc_mount_path_.c_str());
-            break;
-        }
-        e = rmdir(ext_proc_mount_path_.c_str());
-        if (e == -1) {
-            ERROR("failed to rmdir %s", ext_proc_mount_path_.c_str());
-            break;
-        }
-        string sock_path = get_pid_translate_server_path(ext_proc_mount_path_);
-        if (fs::is_accessible(sock_path, F_OK)) {
-            remove(sock_path.c_str());
-        }
-
-        string dir = fs::expand(fs::join(ext_proc_mount_path_, ".."));
-        e = rmdir(dir.c_str());
-        if (e == -1) {
-            ERROR("failed to rmdir %s", dir.c_str());
-            break;
-        }
-        ext_proc_mount_path_ = "";
-    } while (0);
-    return e == 0;
-}
-
 int Cgroup::destroy() {
     killall();
-    umount_ext_proc();
 
     int ret = 0;
     for (int id = 0; id < SUBSYS_COUNT; ++id) {
@@ -509,55 +471,35 @@ static void do_chroot(const Cgroup::spawn_arg& arg) {
 }
 
 static bool should_mount_proc(const Cgroup::spawn_arg& arg) {
-    if (!arg.ext_proc_path.empty()) return false;
     if ((arg.clone_flags & CLONE_NEWPID) == 0 || !fs::is_accessible(fs::PROC_PATH, F_OK | X_OK)) return false;
     return true;
 }
 
 static bool should_hide_sensitive(const Cgroup::spawn_arg& arg) {
+    if (!should_mount_proc(arg)) return false;
+
     // currently there is no option about this behavior
     // assume that --no-new-privs false users do not like this
-    if (!arg.ext_proc_path.empty()) return false;  // probably filterefs will handle the task
     if (!arg.no_new_privs) return false;
     if (getenv("LRUN_DO_NOT_HIDE_SENSITIVE")) return false;
     return true;
 }
 
 static void do_mount_proc(const Cgroup::spawn_arg& arg) {
-    // mount /proc if pid namespace is enabled, and we haven't mount it
-    // in an external path
+    // mount /proc if pid namespace is enabled
     if (!should_mount_proc(arg)) return;
-    INFO("mount procfs");
-    const char *mount_opts = NULL;
-    if (should_hide_sensitive(arg)) mount_opts = "hidepid=2";
-    if (mount("lrun_proc", fs::PROC_PATH, "proc", MS_NOEXEC | MS_NOSUID, mount_opts)) {
+    INFO("mount /proc");
+    if (mount(NULL, "/proc", "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
         FATAL("mount procfs failed");
     }
 }
 
-static void do_mount_ext_proc(const Cgroup::spawn_arg& arg) {
-    const string& path = arg.ext_proc_path;
-    if (path.empty()) return;
-    fs::mkdir_p(path, 0555);
-    INFO("mount procfs to %s", path.c_str());
-    if (mount("lrun_ext_proc", path.c_str(), "proc", MS_NOEXEC | MS_NOSUID, "hidepid=2")) {
-        FATAL("mount procfs to %s failed", path.c_str());
-    }
-}
-
 static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
-    // currently there is no option about this behavior
-    // assume that --no-new-privs false users do not like this
     if (!should_hide_sensitive(arg)) return;
-
-    list<string> hide_paths;
-    hide_paths.push_back(fs::join(fs::PROC_PATH, "sys"));
-
-    FOR_EACH(path, hide_paths) {
-        INFO("hiding %s", path.c_str());
-        if (!fs::is_accessible(path)) continue;
-        mount(NULL, path.c_str(), "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+    if ((arg.clone_flags & CLONE_NEWPID) && getpid() != 1) {
+        mount(NULL, "/proc/1", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
     }
+    mount(NULL, "/proc/sys", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
 }
 
 static list<int> get_fds() {
@@ -833,25 +775,44 @@ static void do_set_new_privs(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static int clone_init_fn(void *clone_arg) {
+static void init_signal_handler(int signal) {
+    if (signal == SIGCHLD) {
+        int status;
+        while (waitpid(-1, &status, WNOHANG) > 0);
+    } else {
+        exit(1);
+    }
+}
+
+static int clone_init_fn(void *) {
     // a dummy init process in new pid namespace
     // intended to be killed via SIGKILL from root pid namespace
     prctl(PR_SET_PDEATHSIG, SIGHUP);
 
-    init::register_signal_handlers();
-
-    Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
-    if (!arg.ext_proc_path.empty()) {
-        string path = get_pid_translate_server_path(arg.ext_proc_path);
-        init::allow_forward_read(arg.ext_proc_path);
-        init::start_pid_translate_server(path);
+    {
+        struct sigaction action;
+        action.sa_handler = init_signal_handler;
+        sigemptyset(&action.sa_mask);
+        action.sa_flags = 0;
+        sigaction(SIGKILL, &action, NULL);
+        sigaction(SIGHUP, &action, NULL);
+        sigaction(SIGINT, &action, NULL);
+        sigaction(SIGTERM, &action, NULL);
+        sigaction(SIGABRT, &action, NULL);
+        sigaction(SIGQUIT, &action, NULL);
+        sigaction(SIGPIPE, &action, NULL);
+        sigaction(SIGALRM, &action, NULL);
+        sigaction(SIGCHLD, &action, NULL);
     }
 
-    INFO("init enters sleep mode");
-    list<int> fds = get_fds();
-    FOR_EACH(fd, fds) close(fd);
-    while (1) pause();
+    // close all fds
+    {
+        list<int> fds = get_fds();
+        INFO("init is running");
+        FOR_EACH(fd, fds) close(fd);
+    }
 
+    while (1) pause();
     return 0;
 }
 
@@ -869,7 +830,6 @@ static int clone_main_fn(void * clone_arg) {
     // etc.
     do_set_sysctl();
 #endif
-    do_mount_ext_proc(arg);
     do_set_uts(arg);
     do_close_high_fds(arg);
     do_privatize_filesystem(arg);
@@ -1016,12 +976,6 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     if (arg.uid <= 0 || arg.gid <= 0) {
         WARNING("uid and gid can not <= 0. spawn rejected");
         return -2;
-    }
-
-    // set ext proc path
-    if (!arg.ext_proc_path.empty()) {
-        ext_proc_mount_path_ = arg.ext_proc_path;
-        fs::mkdir_p(arg.ext_proc_path, 0555);
     }
 
     // stack size for cloned processes

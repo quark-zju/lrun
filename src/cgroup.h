@@ -253,8 +253,6 @@ namespace lrun {
                 std::string chroot_path;    // chroot path, empty if not need to chroot
                 std::string chdir_path;     // chdir path, empty if not need to chdir
                 std::string syscall_list;   // syscall whitelist or blacklist
-                std::string ext_proc_path;  // mount /proc to an external path. designed to work
-                                            // together with filterefs --forward-cg-proc
                 struct {                    // set uts namespace strings
                     std::string sysname;
                     std::string nodename;
@@ -292,27 +290,22 @@ namespace lrun {
              */
             pid_t spawn(spawn_arg& arg);
 
-            /**
-             * umount ext proc if it is mounted
-             * @return   1           successful
-             *           0           error
-             */
-            bool umount_ext_proc();
-
         private:
 
             Cgroup();
 
+            /**
+             * cgroup directory name
+             */
             std::string name_;
-            std::string ext_proc_mount_path_;
 
             /**
-             * count output bytes. keys are pid
+             * count output bytes
              */
             std::map<long, long long> output_counter_;
 
             /**
-             * init pid (only valid if pid namespace is enabled)
+             * cached init pid (only valid if pid namespace is enabled)
              */
             pid_t init_pid_;
 
