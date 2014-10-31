@@ -280,6 +280,21 @@ int fs::umount(const string& dest, bool lazy) {
     }
 }
 
+std::list<string> fs::list_dir(const string& path) {
+    std::list<string> result;
+    struct dirent **namelist = 0;
+    int nlist = scandir(path.c_str(), &namelist, 0, alphasort);
+    for (int i = 0; i < nlist; ++i) {
+        const char * name = namelist[i]->d_name;
+        // skip . and ..
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
+        result.push_back(name);
+        free(namelist[i]);
+    }
+    if (namelist) free(namelist);
+    return result;
+}
+
 fs::ScopedFileLock::ScopedFileLock(const char path[]) {
     int fd = open(path, O_RDONLY);
     if (fd < 0) return;

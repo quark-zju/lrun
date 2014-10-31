@@ -24,6 +24,7 @@
 
 #include <fcntl.h>
 #include <string>
+#include <list>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <unistd.h>
@@ -137,10 +138,17 @@ namespace lrun {
 
         /**
          * if path is a directory
-         * @return   1          is a directory
+         * @return   1          is a directory and is readable
          *           0          not a directory
          */
         int is_dir(const std::string& path);
+
+        /**
+         * list a directory
+         * @param  path         directory path
+         * @return list<string> file and directory entries, exclude ".", ".."
+         */
+        std::list<std::string> list_dir(const std::string& path);
 
         /**
          * mkdir -p

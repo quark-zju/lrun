@@ -499,7 +499,17 @@ static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
     if ((arg.clone_flags & CLONE_NEWPID) && getpid() != 1) {
         mount(NULL, "/proc/1", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
     }
-    mount(NULL, "/proc/sys", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+    list<string> files = fs::list_dir(fs::PROC_PATH);
+    FOR_EACH(file, files) {
+        if (file[0] >= '0' && file[0] <= '9') continue;
+        if (arg.proc_skip_chomd_files.count(file) || arg.proc_skip_chomd_files.count("ALL")) continue;
+        INFO("chmod %s", file.c_str());
+        if (file == "sys") {  // sys has no get/setattr support
+            mount(NULL, "/proc/sys", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+            continue;
+        }
+        fs::chmod(fs::join(fs::PROC_PATH, file), 0000);
+    }
 }
 
 static list<int> get_fds() {
