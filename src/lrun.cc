@@ -225,7 +225,7 @@ static void print_help(const string& submodule = "") {
             , width, 4);
         content += line_wrap(
             "Option processing order:\n"
-            "  --hostname, --fd, --bindfs, --bindfs-ro, --chroot, (mount /proc), --tmpfs,"
+            "  --hostname, --fd, (mount /proc), --bindfs, --bindfs-ro, --chroot, --tmpfs,"
             " --remount-dev, --chdir, --cmd, --umask, --gid, --uid, (rlimit options), --env, --nice,"
             " (cgroup limits), --syscalls\n"
             "\n"

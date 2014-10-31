@@ -471,7 +471,7 @@ static void do_chroot(const Cgroup::spawn_arg& arg) {
 }
 
 static bool should_mount_proc(const Cgroup::spawn_arg& arg) {
-    if ((arg.clone_flags & CLONE_NEWPID) == 0 || !fs::is_accessible(fs::PROC_PATH, F_OK | X_OK)) return false;
+    if ((arg.clone_flags & CLONE_NEWPID) == 0 || !fs::is_accessible(fs::join(arg.chroot_path, fs::PROC_PATH), F_OK | X_OK)) return false;
     return true;
 }
 
@@ -488,8 +488,9 @@ static bool should_hide_sensitive(const Cgroup::spawn_arg& arg) {
 static void do_mount_proc(const Cgroup::spawn_arg& arg) {
     // mount /proc if pid namespace is enabled
     if (!should_mount_proc(arg)) return;
-    INFO("mount /proc");
-    if (mount(NULL, "/proc", "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
+    string dest = fs::join(arg.chroot_path, fs::PROC_PATH);
+    INFO("mount procfs at %s", dest.c_str());
+    if (mount(NULL, dest.c_str(), "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
         FATAL("mount procfs failed");
     }
 }
@@ -497,9 +498,9 @@ static void do_mount_proc(const Cgroup::spawn_arg& arg) {
 static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
     if (!should_hide_sensitive(arg)) return;
     if ((arg.clone_flags & CLONE_NEWPID) && getpid() != 1) {
-        mount(NULL, "/proc/1", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+        mount(NULL, fs::join(arg.chroot_path, "/proc/1").c_str(), "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
     }
-    mount(NULL, "/proc/sys", "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+    mount(NULL, fs::join(arg.chroot_path, "/proc/sys").c_str(), "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
 }
 
 static list<int> get_fds() {
@@ -833,11 +834,11 @@ static int clone_main_fn(void * clone_arg) {
     do_set_uts(arg);
     do_close_high_fds(arg);
     do_privatize_filesystem(arg);
+    do_mount_proc(arg);
+    do_hide_sensitive(arg);
     do_mount_bindfs(arg);
     do_remounts(arg);
     do_chroot(arg);
-    do_mount_proc(arg);
-    do_hide_sensitive(arg);
     do_mount_tmpfs(arg);
     do_remount_dev(arg);
     do_chdir(arg);
