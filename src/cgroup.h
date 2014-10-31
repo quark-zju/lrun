@@ -275,8 +275,6 @@ namespace lrun {
                 std::set<int> keep_fds;     // Do not close these fd
                 std::map<int, rlim_t> rlimits;
                                             // [resource, value] rlimit list
-                std::set<std::string> proc_skip_chomd_files;
-                                            // Do not chmod proc files in this set
                 int reset_env;              // Do not inherit env
                 int remount_dev;            // Recreate a minimal dev
                 std::list<std::pair<std::string, std::string> > env_list;

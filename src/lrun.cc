@@ -493,9 +493,6 @@ static void parse_cli_options(int argc, char * argv[]) {
             REQUIRE_NARGV(1);
             string cmd = NEXT_STRING_ARG;
             config.arg.cmd_list.push_back(cmd);
-        } else if (option == "proc-skip-chmod") {
-            REQUIRE_NARGV(1);
-            config.arg.proc_skip_chomd_files.insert(NEXT_STRING_ARG);
         } else if (option == "help") {
             print_help();
         } else if (option == "help-syscalls" && seccomp::supported()) {
