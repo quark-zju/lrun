@@ -179,6 +179,7 @@ static void print_help(const string& submodule = "") {
             "  --network         bool        Whether network access is permitted\n"
             "  --pass-exitcode   bool        Discard lrun exit code, pass child process's exit code\n"
             "  --chroot          path        Chroot to specified `path` before exec\n"
+            "  --umount-outside  bool        Umount everything outside the chroot path. This is not necessary but can help to hide mount information. Note: umount is SLOW\n"
             "  --chdir           path        Chdir to specified `path` after chroot\n"
             "  --nice            value       Add nice with specified `value`. Only root can use a negative value\n"
             "  --umask           int         Set umask\n"
@@ -225,7 +226,7 @@ static void print_help(const string& submodule = "") {
             , width, 4);
         content += line_wrap(
             "Option processing order:\n"
-            "  --hostname, --fd, (mount /proc), --bindfs, --bindfs-ro, --chroot, --tmpfs,"
+            "  --hostname, --fd, --umount-outside, (mount /proc), --bindfs, --bindfs-ro, --chroot, --tmpfs,"
             " --remount-dev, --chdir, --cmd, --umask, --gid, --uid, (rlimit options), --env, --nice,"
             " (cgroup limits), --syscalls\n"
             "\n"
@@ -234,7 +235,7 @@ static void print_help(const string& submodule = "") {
             "Default options:\n"
             "  lrun --network true --basic-devices false --isolate-process true"
             " --remount-dev false --reset-env false --interval 0.02"
-            " --pass-exitcode false --no-new-privs true"
+            " --pass-exitcode false --no-new-privs true --umount-outside false"
             " --max-nprocess 2048 --max-nfile 256"
             " --max-rtprio 0 --nice 0\n"
             , width, 7, " \\");
@@ -283,6 +284,7 @@ static void init_default_config() {
     config.arg.remount_dev = 0;
     config.arg.reset_env = 0;
     config.arg.no_new_privs = true;
+    config.arg.umount_outside = false;
     config.arg.clone_flags = 0;
 
     // arg.rlimits settings
@@ -398,6 +400,9 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "no-new-privs") {
             REQUIRE_NARGV(1);
             config.arg.no_new_privs = NEXT_BOOL_ARG;
+        } else if (option == "umount-outside") {
+            REQUIRE_NARGV(1);
+            config.arg.umount_outside = NEXT_BOOL_ARG;
         } else if (option == "syscalls" && seccomp::supported()) {
             REQUIRE_NARGV(1);
             string syscalls = NEXT_STRING_ARG;

@@ -74,6 +74,32 @@ int Cgroup::subsys_id_from_name(const char * const name) {
     return -1;
 }
 
+typedef struct {
+    string type;
+    string opts;
+    string fsname;
+    string dir;
+} mount_entrie;
+
+static std::map<string, mount_entrie> get_mounts() {
+    std::map<string, mount_entrie> result;
+    FILE *fp = setmntent(fs::MOUNTS_PATH, "r");
+    if (!fp) {
+        FATAL("can not read %s", fs::MOUNTS_PATH);
+        return result;
+    }
+    for (struct mntent *ent; (ent = getmntent(fp));) {
+        result[string(ent->mnt_dir)] = {
+            /* .type = */ ent->mnt_type,
+            /* .opts = */ ent->mnt_opts,
+            /* .fsname = */ ent->mnt_fsname,
+            /* .dir = */ ent->mnt_dir
+        };
+    }
+    endmntent(fp);
+    return result;
+}
+
 string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
     {
         // FIXME cache may not work when user manually umount cgroup
@@ -82,28 +108,21 @@ string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
         if ((!path.empty()) && fs::is_dir(path)) return path;
     }
 
-    // enumerate mounts
-    std::map<string, string> mounts;
-    FILE *fp = setmntent(fs::MOUNTS_PATH, "r");
-    if (!fp) {
-        FATAL("can not read %s", fs::MOUNTS_PATH);
-        return "";
-    }
-
-    // no cgroups mounted, prepare one
     const char * const MNT_SRC_NAME = "cgroup_lrun";
     const char * MNT_DEST_BASE_PATH = "/sys/fs/cgroup";
     const char * subsys_name = subsys_names[subsys_id];
 
-    for (struct mntent *ent; (ent = getmntent(fp));) {
-        mounts[string(ent->mnt_dir)] = string(ent->mnt_type);
-        if (strcmp(ent->mnt_type, fs::TYPE_CGROUP)) continue;
-        if (strstr(ent->mnt_opts, subsys_name)) {
-            INFO("cgroup %s path = '%s'", subsys_name, ent->mnt_dir);
-            return (subsys_base_paths_[subsys_id] = string(ent->mnt_dir));
+    std::map<string, mount_entrie> mounts = get_mounts();
+    FOR_EACH_CONST(p, mounts) {
+        const mount_entrie& ent = p.second;
+        if (ent.type != string(fs::TYPE_CGROUP)) continue;
+        if (strstr(ent.opts.c_str(), subsys_name)) {
+            INFO("cgroup %s path = '%s'", subsys_name, ent.dir.c_str());
+            return (subsys_base_paths_[subsys_id] = string(ent.dir));
         }
     }
 
+    // no cgroups mounted, prepare one
     if (!create_on_need) return "";
 
     if (!fs::is_dir(MNT_DEST_BASE_PATH)) {
@@ -466,6 +485,28 @@ static void do_chroot(const Cgroup::spawn_arg& arg) {
         INFO("chroot %s", path.c_str());
         if (chroot(path.c_str())) {
             FATAL("chroot '%s' failed", path.c_str());
+        }
+    }
+}
+
+static void do_umount_outside_chroot(const Cgroup::spawn_arg& arg) {
+    if (!arg.umount_outside) return;
+    if (arg.chroot_path.empty()) return;
+
+    std::map<string, mount_entrie> mounts = get_mounts();
+    list<string> umount_list;
+    FOR_EACH(p, mounts) {
+        const string& dest = p.second.dir;
+        if (arg.chroot_path.substr(0, dest.length()) == dest) continue;
+        if (dest.substr(0, arg.chroot_path.length()) == arg.chroot_path) continue;
+        umount_list.push_front(dest);
+    }
+
+    // umount in reversed order
+    FOR_EACH(dest, umount_list) {
+        INFO("umount %s", dest.c_str());
+        if (umount2(dest.c_str(), MNT_DETACH) == -1) {
+            WARNING("cannot umount %s", dest.c_str());
         }
     }
 }
@@ -834,6 +875,7 @@ static int clone_main_fn(void * clone_arg) {
     do_set_uts(arg);
     do_close_high_fds(arg);
     do_privatize_filesystem(arg);
+    do_umount_outside_chroot(arg);
     do_mount_proc(arg);
     do_hide_sensitive(arg);
     do_mount_bindfs(arg);

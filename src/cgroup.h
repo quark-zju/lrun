@@ -249,6 +249,7 @@ namespace lrun {
                 mode_t umask;               // umask
                 int nice;                   // nice
                 bool no_new_privs;          // prctl PR_SET_NO_NEW_PRIVS
+                bool umount_outside;        // umount things outside chroot
                 int sockets[2];             // for sync between child and parent
                 std::string chroot_path;    // chroot path, empty if not need to chroot
                 std::string chdir_path;     // chdir path, empty if not need to chdir
