@@ -512,8 +512,8 @@ static void do_umount_outside_chroot(const Cgroup::spawn_arg& arg) {
 }
 
 static bool should_mount_proc(const Cgroup::spawn_arg& arg) {
-    if ((arg.clone_flags & CLONE_NEWPID) == 0 || !fs::is_accessible(fs::join(arg.chroot_path, fs::PROC_PATH), F_OK | X_OK)) return false;
-    return true;
+    if (!fs::is_accessible(fs::join(arg.chroot_path, fs::PROC_PATH), F_OK | X_OK)) return false;
+    return (arg.clone_flags & CLONE_NEWPID) != 0 || !arg.chroot_path.empty();
 }
 
 static bool should_hide_sensitive(const Cgroup::spawn_arg& arg) {
