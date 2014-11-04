@@ -6,7 +6,8 @@ BIN          = 'lrun'
 CXX          = ENV['CXX'] || 'g++'
 CXXFLAGS     = ENV['CXXFLAGS'] || '-Os -Wall -Wwrite-strings -Wunused-result -pipe'
 LD           = CXX
-PREFIX       = ENV['PREFIX'] || '/usr/local'
+LDFLAGS      = ENV['LDFLAGS']
+PREFIX       = ENV['PREFIX'] || (ENV['DESTDIR'] ? '/usr' : '/usr/local')
 INSTALL      = ENV['INSTALL'] || 'install'
 SUDO         = ENV['SUDO'] || 'sudo'
 LRUN_GROUP   = ENV['LRUN_GROUP'] || 'lrun'
@@ -16,6 +17,7 @@ NULL         = ENV['NULL'] || '/dev/null'
 NODEBUG_FLAG = ENV['NDEBUG'] ? '-DNDEBUG' : '-g'
 GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 NOSECCOMP    = ENV['NOSECCOMP']
+NOSUDO       = ENV['NOSUDO']
 
 FALLBACK_VER = 'v0.9.9'
 
@@ -130,7 +132,7 @@ def get_libseccomp_cflags
 end
 
 def root_sh(command)
-  if Process.uid == 0
+  if Process.uid == 0 || NOSUDO
     sh command
   else
     require_executable! SUDO
@@ -155,7 +157,7 @@ end
 
 file BIN => OBJ do |t|
   require_executable! LD
-  sh "#{LD} -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs} #{get_other_libs}"
+  sh "#{LD} #{LDFLAGS} -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs} #{get_other_libs}"
 end
 
 task :lrun_group do |t|

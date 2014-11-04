@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+
+DEB_BUILD_HARDENING=1
+DPKG_EXPORT_BUILDFLAGS=1
+include /usr/share/dpkg/buildflags.mk
+
+export NOSUDO=1
+export LRUN_GROUP=root
+
+%:
+	dh ${@}

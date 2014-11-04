@@ -1,0 +1,31 @@
+#!/bin/sh
+
+set -e
+
+case "${1}" in
+	configure)
+		if ! getent group lrun > /dev/null 2>&1
+		then
+			echo "Creating lrun group..."
+			addgroup --system lrun
+		fi
+
+		if ! dpkg-statoverride --list /usr/bin/lrun >/dev/null; then
+			chown root:lrun /usr/bin/lrun
+			chmod 4550 /usr/bin/lrun
+		fi
+		;;
+
+	abort-upgrade|abort-remove|abort-deconfigure)
+
+		;;
+
+	*)
+		echo "postinst called with unknown argument \`${1}'" >&2
+		exit 1
+		;;
+esac
+
+exit 0
+
+# vim: ft=sh
