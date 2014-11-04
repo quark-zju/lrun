@@ -19,7 +19,7 @@ GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 NOSECCOMP    = ENV['NOSECCOMP']
 NOSUDO       = ENV['NOSUDO']
 
-FALLBACK_VER = 'v0.9.9'
+FALLBACK_VER = 'v1.0.0'
 
 CLEAN.include('*.o')
 CLOBBER.include(BIN)
