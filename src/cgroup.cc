@@ -520,27 +520,40 @@ static bool should_hide_sensitive(const Cgroup::spawn_arg& arg) {
     if (!should_mount_proc(arg)) return false;
 
     // currently there is no option about this behavior
-    // assume that --no-new-privs false users do not like this
+    // when `--no-new-privs false`, the user does not want to hide anything
     if (!arg.no_new_privs) return false;
     if (getenv("LRUN_DO_NOT_HIDE_SENSITIVE")) return false;
     return true;
 }
 
+static const char * get_proc_fs_type(const Cgroup::spawn_arg& arg) {
+    // use "liteproc" when possible
+    static const char proc_fs[] = "proc";
+    static const char liteproc_fs[] = "liteproc";
+    // when `--no-new-privs false`, the user does not want to hide anything
+    if (!arg.no_new_privs) return proc_fs;
+    // 4KB is probably enough for /proc/filesystems.
+    // on my system, it is 398 bytes now.
+    if (fs::read("/proc/filesystems", 4095).find("liteproc") == string::npos) {
+        return proc_fs;
+    } else {
+        return liteproc_fs;
+    }
+}
+
 static void do_mount_proc(const Cgroup::spawn_arg& arg) {
-    // mount /proc if pid namespace is enabled
+    // mount /proc if pid namespace is enabled and the directory exists
     if (!should_mount_proc(arg)) return;
     string dest = fs::join(arg.chroot_path, fs::PROC_PATH);
     INFO("mount procfs at %s", dest.c_str());
-    if (mount(NULL, dest.c_str(), "proc", MS_NOEXEC | MS_NOSUID, NULL)) {
+    const char * mount_opts = should_hide_sensitive(arg) ? "hidepid=2" : NULL;
+    if (mount(NULL, dest.c_str(), get_proc_fs_type(arg), MS_NOEXEC | MS_NOSUID, mount_opts)) {
         FATAL("mount procfs failed");
     }
 }
 
 static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
     if (!should_hide_sensitive(arg)) return;
-    if ((arg.clone_flags & CLONE_NEWPID) && getpid() != 1) {
-        mount(NULL, fs::join(arg.chroot_path, "/proc/1").c_str(), "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
-    }
     mount(NULL, fs::join(arg.chroot_path, "/proc/sys").c_str(), "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
 }
 
