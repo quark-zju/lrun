@@ -512,7 +512,7 @@ static void do_umount_outside_chroot(const Cgroup::spawn_arg& arg) {
 }
 
 static bool should_mount_proc(const Cgroup::spawn_arg& arg) {
-    if (!fs::is_accessible(fs::join(arg.chroot_path, fs::PROC_PATH), F_OK | X_OK)) return false;
+    if (!fs::is_accessible(fs::join(arg.chroot_path, fs::PROC_PATH), X_OK)) return false;
     return (arg.clone_flags & CLONE_NEWPID) != 0 || !arg.chroot_path.empty();
 }
 
@@ -554,7 +554,10 @@ static void do_mount_proc(const Cgroup::spawn_arg& arg) {
 
 static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
     if (!should_hide_sensitive(arg)) return;
-    mount(NULL, fs::join(arg.chroot_path, "/proc/sys").c_str(), "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+    string proc_sys_path = fs::join(arg.chroot_path, "/proc/sys");
+    if (fs::is_accessible(proc_sys_path, X_OK)) {
+        mount(NULL, proc_sys_path.c_str(), "tmpfs", MS_NOSUID | MS_RDONLY, "size=0");
+    }
 }
 
 static list<int> get_fds() {
