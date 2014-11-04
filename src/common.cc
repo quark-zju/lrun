@@ -41,7 +41,7 @@ static char log_lock_path[80];
 static char* get_log_lock_path() {
     if (!log_lock_path[0]) {
         // create lock file
-        snprintf(log_lock_path, sizeof log_lock_path, "/tmp/.%d-log.lock", (int)getpid());
+        snprintf(log_lock_path, sizeof log_lock_path, "/tmp/.%lu-log.lock", (unsigned long)getpid());
         int fd = open(log_lock_path, O_CREAT | O_TRUNC | O_WRONLY, 0444);
         if (fd != -1) close(fd);
     }

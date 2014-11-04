@@ -214,11 +214,11 @@ void Cgroup::update_output_count() {
     if (fs::read(procs_path, 4).empty()) return;
 
     FILE * procs = fopen(procs_path.c_str(), "r");
-    char spid[sizeof(pid_t) * 4];
-    while (fscanf(procs, "%s", spid) == 1) {
-        long pid;
-        long long bytes = 0;
-        sscanf(spid, "%ld", &pid);
+    char spid[26]; // sizeof(pid_t) * 3 + 2, assuming sizeof(pid_t) is 8
+    while (fscanf(procs, "%25s", spid) == 1) {
+        unsigned long pid;
+        unsigned long long bytes = 0;
+        if (sscanf(spid, "%lu", &pid) == 0) continue;
         FILE * io = fopen((string(fs::PROC_PATH) + "/" + spid + "/io").c_str(), "r");
         if (!io) continue;
         int res = 0;
@@ -245,8 +245,8 @@ list<pid_t> Cgroup::get_pids() {
     list<pid_t> pids;
 
     if (procs) {
-        long pid;
-        while (fscanf(procs, "%ld", &pid) == 1) pids.push_back((pid_t)pid);
+        unsigned long pid;
+        while (fscanf(procs, "%lu", &pid) == 1) pids.push_back((pid_t)pid);
         fclose(procs);
     }
     return pids;
@@ -309,13 +309,13 @@ void Cgroup::killall() {
         // cancel memory limit. this will wake up some D state processes,
         // which are allocating memory and reached memory limit.
         set_memory_limit(-1);
-        INFO("sent SIGKILL to init process %d", (int)init_pid_);
+        INFO("sent SIGKILL to init process %lu", (unsigned long)init_pid_);
         init_pid_ = 0;
     } else {
         freeze(1);
         list<pid_t> pids = get_pids();
         FOR_EACH(p, pids) kill(p, SIGKILL);
-        INFO("sent SIGKILLs to %d processes", (int)pids.size());
+        INFO("sent SIGKILLs to %lu processes", (unsigned long)pids.size());
         freeze(0);
     }
 
@@ -358,7 +358,7 @@ int Cgroup::inherit(subsys_id_t subsys_id, const string& property) {
 
 int Cgroup::attach(pid_t pid) {
     char pidbuf[32];
-    snprintf(pidbuf, sizeof(pidbuf), "%ld\n", (long)pid);
+    snprintf(pidbuf, sizeof(pidbuf), "%lu\n", (unsigned long)pid);
 
     int ret = 0;
     for (int id = 0; id < SUBSYS_COUNT; ++id) {
@@ -1045,7 +1045,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         }
 
         // switch to that pid namespace for our next clone
-        string pidns_path = string(fs::PROC_PATH) + "/" + strconv::from_long(long(init_pid_)) + "/ns/pid";
+        string pidns_path = string(fs::PROC_PATH) + "/" + strconv::from_ulong((unsigned long)init_pid_) + "/ns/pid";
         INFO("set pid ns to %s", pidns_path.c_str());
         int pidns_fd = open(pidns_path.c_str(), O_RDONLY);
         if (pidns_fd < 0) {
@@ -1088,10 +1088,10 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         goto cleanup;
     }
 
-    INFO("child pid = %d", (int)child_pid);
+    INFO("child pid = %lu", (unsigned long)child_pid);
 
     // attach child to current cgroup
-    INFO("attach %d", (int)child_pid);
+    INFO("attach %lu", (unsigned long)child_pid);
     attach(child_pid);
 
     // child is blocking, waiting us before exec, let it go

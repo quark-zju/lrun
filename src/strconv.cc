@@ -39,6 +39,12 @@ long conv::to_long(const string& str) {
     return v;
 }
 
+unsigned long conv::to_ulong(const string& str) {
+    unsigned long v = 0;
+    sscanf(str.c_str(), "%lu", &v);
+    return v;
+}
+
 long long conv::to_longlong(const string& str) {
     long long v = 0;
     sscanf(str.c_str(), "%lld", &v);
@@ -91,6 +97,12 @@ string conv::from_double(double value, int precision) {
 string conv::from_long(long value) {
     char buf[sizeof(long) * 3 + 1];
     snprintf(buf, sizeof buf, "%ld", value);
+    return buf;
+}
+
+string conv::from_ulong(unsigned long value) {
+    char buf[sizeof(unsigned long) * 3 + 1];
+    snprintf(buf, sizeof buf, "%lu", value);
     return buf;
 }
 

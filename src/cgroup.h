@@ -303,7 +303,7 @@ namespace lrun {
             /**
              * count output bytes
              */
-            std::map<long, long long> output_counter_;
+            std::map<unsigned long, unsigned long long> output_counter_;
 
             /**
              * cached init pid (only valid if pid namespace is enabled)

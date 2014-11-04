@@ -705,7 +705,7 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
 }
 
 static char get_process_state(pid_t pid) {
-    FILE * fstatus = fopen((string(fs::PROC_PATH) + "/" + strconv::from_longlong(pid) + "/status").c_str(), "r");
+    FILE * fstatus = fopen((string(fs::PROC_PATH) + "/" + strconv::from_ulong((unsigned long)pid) + "/status").c_str(), "r");
     char state = 0;
     if (!fstatus) return 0;
     int ret = fscanf(fstatus, "%*[^\n] State: %c", &state);
@@ -758,7 +758,7 @@ static void setup_signal_handlers() {
 static void create_cgroup() {
     // pick an unique name and create a cgroup in filesystem
     string cgname = config.cgname;
-    if (cgname.empty()) cgname = "lrun" + strconv::from_long((long)getpid());
+    if (cgname.empty()) cgname = "lrun" + strconv::from_ulong((unsigned long)getpid());
     INFO("cgname = '%s'", cgname.c_str());
 
     // create or reuse group

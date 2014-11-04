@@ -88,7 +88,7 @@ struct ScopedLogLock {
 # define PRINT_TIMESTAMP \
     {   \
       if (DEBUG_TIMESTAMP) fprintf(stderr, "[%8.3f]", TIMESTAMP); \
-      if (DEBUG_PID) fprintf(stderr, "[%6d] ", (int)getpid()); \
+      if (DEBUG_PID) fprintf(stderr, "[%6lu] ", (unsigned long)getpid()); \
     }
 # define INFO(...) \
     if (__builtin_expect(DEBUG_ENABLED, 0)) { \
