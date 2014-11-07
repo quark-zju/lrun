@@ -22,6 +22,8 @@
 
 #pragma once
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 namespace test {
     extern int total_case;
@@ -72,6 +74,7 @@ namespace test {
 #define TESTCASE(name) \
     void test_ ## name(); \
     __attribute__((constructor(65535))) void auto_test_ ## name() { \
+        if (getenv("TESTCASE_FOCUS") && strcmp(getenv("TESTCASE_FOCUS"), #name) != 0) return;\
         test::term::set(); \
         test::new_line(); \
         printf("[%s] ", #name); \
