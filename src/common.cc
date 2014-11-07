@@ -49,6 +49,7 @@ static char* get_log_lock_path() {
 }
 
 ScopedLogLock::ScopedLogLock() {
+    if (!DEBUG_ENABLED) return;
     this->fd_ = -1;
     int fd = open(get_log_lock_path(), O_RDONLY);
     if (fd < 0) return;
@@ -60,6 +61,7 @@ ScopedLogLock::ScopedLogLock() {
 }
 
 ScopedLogLock::~ScopedLogLock() {
+    if (!DEBUG_ENABLED) return;
     int fd = this->fd_;
     if (fd < 0) return;
     flock(fd, LOCK_UN);
