@@ -438,7 +438,7 @@ __attribute__((unused)) static void do_set_sysctl() {
     fs::write("/proc/sys/kernel/dmesg_restrict", "1\n");
 }
 
-static void do_privatize_filesystem(const Cgroup::spawn_arg& arg) {
+static void do_privatize_filesystem(__attribute__((unused)) const Cgroup::spawn_arg& arg) {
     // make sure filesystem not be shared
     // ignore this step for old systems without these features
     int type = MS_PRIVATE | MS_REC;
@@ -915,7 +915,7 @@ static int clone_main_fn(void * clone_arg) {
 
     // let parent know we got the message, parent then can close fd without SIGPIPE child
     INFO("got from parent: '%3s'. notify parent", buf);
-    strcpy(buf, "PRE");
+    strncpy(buf, "PRE", sizeof buf);
     ret = write(arg.sockets[0], buf, sizeof buf);
     (void)ret;
 
@@ -938,7 +938,7 @@ static int clone_main_fn(void * clone_arg) {
     ERROR("exec '%s' failed", arg.args[0]);
 
     // notify parent that exec failed
-    strcpy(buf, "ERR");
+    strncpy(buf, "ERR", sizeof buf);
     ret = write(arg.sockets[0], buf, sizeof buf);
     (void)ret;
 
@@ -1111,7 +1111,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     attach(child_pid);
 
     // child is blocking, waiting us before exec, let it go
-    strcpy(buf, "RUN");
+    strncpy(buf, "RUN", sizeof buf);
     close(arg.sockets[0]);
     ret = send(arg.sockets[1], buf, sizeof buf, MSG_NOSIGNAL);
     if (ret < 0) {

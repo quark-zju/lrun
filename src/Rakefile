@@ -4,9 +4,9 @@ SRC          = FileList['*.cc']
 OBJ          = SRC.ext('o')
 BIN          = 'lrun'
 CXX          = ENV['CXX'] || 'g++'
-CXXFLAGS     = ENV['CXXFLAGS'] || '-Os -Wall -Wwrite-strings -Wunused-result -pipe'
+CXXFLAGS     = ENV['CXXFLAGS'] || '-Wall -Wextra -Wunused-result -pipe'
 LD           = CXX
-LDFLAGS      = ENV['LDFLAGS']
+LDFLAGS      = ENV['LDFLAGS'] || '-Wl,-O1,--sort-common,--as-needed,-z,relro'
 PREFIX       = ENV['PREFIX'] || (ENV['DESTDIR'] ? '/usr' : '/usr/local')
 INSTALL      = ENV['INSTALL'] || 'install'
 SUDO         = ENV['SUDO'] || 'sudo'
@@ -19,7 +19,7 @@ GROUPADD     = ENV['GROUPADD'] || 'groupadd'
 NOSECCOMP    = ENV['NOSECCOMP']
 NOSUDO       = ENV['NOSUDO']
 
-FALLBACK_VER = 'v1.0.0'
+FALLBACK_VER = 'v1.0.1'
 
 CLEAN.include('*.o')
 CLOBBER.include(BIN)
@@ -67,16 +67,22 @@ def pkgconfig(params)
   end
 end
 
-def try_cxxflags(*flags)
+def try_cxxflags(flags, start_with_check = nil)
+  # check existing flags
+  @existing_flags ||= CXXFLAGS.split
+  start_with_check ||= flags.first.gsub(/=.*$/, '')
+  return '' if @existing_flags.any? {|f| f.start_with?(start_with_check)}
+
+  # try g++ flags one by one.
   @cflags ||= {}
   blank_cpp_path = File.join((Dir.tmpdir rescue TMP_DIR), ".blank.cpp")
   unless File.exist? blank_cpp_path
     File.write(blank_cpp_path, 'int main() { return 0; }')
   end
 
-  @cflags[flags.to_s] ||= flags.find do |flag|
+  @cflags[flags.to_s] ||= (flags.find do |flag|
     system "#{CXX} #{flag} #{blank_cpp_path} -E 1>#{NULL} 2>#{NULL}"
-  end
+  end || '')
 ensure
   File.unlink blank_cpp_path rescue nil
 end
@@ -147,7 +153,12 @@ end
 task :default => [BIN]
 
 rule '.o' => '.cc' do |t|
-  flags = [try_cxxflags('-std=c++11', '-std=c++0x', ''), CXXFLAGS, NODEBUG_FLAG,
+  flags = [try_cxxflags(['-std=c++11', '-std=c++0x'], '-std='),
+           try_cxxflags(['-fstack-protector-strong', '-fstack-protector'], '-fstack'),
+           try_cxxflags(['--param=ssp-buffer-size=4'], '--param=ssp-buffer-size'),
+           try_cxxflags(['-D_FORTIFY_SOURCE=2'], '-D_FORTIFY_SOURCE'),
+           try_cxxflags(['-Os'], '-O'),
+           CXXFLAGS, NODEBUG_FLAG,
            "-DLIBSECCOMP_VERSION_MAJOR=#{NOSECCOMP ? 0 : get_libseccomp_version}",
            "-DVERSION=\\\"#{get_version}\\\"",
            get_libseccomp_cflags].join(' ')

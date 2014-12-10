@@ -194,7 +194,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
                         if (scmp_action_ /* default action */ == SCMP_ACT_ALLOW && current_action != SCMP_ACT_ALLOW && current_arg_array.empty()) {
                             // the user is trying to add execve to a blacklist
                             // remove our execve from the condition
-                            current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_NE, execve_arg1_));
+                            current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_NE, execve_arg1_, /* not used */ 0));
                         } else if (!current_arg_array.empty() || current_action != SCMP_ACT_ALLOW) {
                             WARNING("can not guarntee execve by lrun is allowed");
                         }
@@ -266,7 +266,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
     if (!execve_handled && scmp_action_ != SCMP_ACT_ALLOW && execve_arg1_) {
         // a whitelist with no execve yet, add execve that only allows ours call
         reset_syscall_rule;
-        current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_EQ, execve_arg1_));
+        current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_EQ, execve_arg1_, /* not used */ 0));
         int ret = seccomp_rule_add_array(ctx, SCMP_ACT_ALLOW, execve_no, current_arg_array.size(), current_arg_array.data());
         if (ret) WARNING("can not add lrun execve to syscall whitelist");
     }

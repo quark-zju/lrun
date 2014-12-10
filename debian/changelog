@@ -1,3 +1,9 @@
+lrun (1.0.1) unstable; urgency=low
+
+  * Minor fixes.
+
+ -- Jun Wu <quark@lihdd.net>  Wed, 10 Dec 2014 13:54:08 +0800
+
 lrun (1.0.0) unstable; urgency=low
 
   * Initial debian package release.
