@@ -69,7 +69,7 @@ std::string Cgroup::subsys_base_paths_[sizeof(subsys_names) / sizeof(subsys_name
 
 int Cgroup::subsys_id_from_name(const char * const name) {
     for (size_t i = 0; i < sizeof(Cgroup::subsys_names) / sizeof(Cgroup::subsys_names[0]); ++i) {
-        if (strcmp(name, subsys_names[i])) return i;
+        if (strcmp(name, subsys_names[i]) == 0) return i;
     }
     return -1;
 }

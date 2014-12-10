@@ -108,6 +108,9 @@ namespace lrun {
 
             /**
              * set a cgroup property
+             * WARNING: property is not filtered, do not pass untrusted user-generated
+             * content here!
+             *
              * @param   property    property
              * @param   value       value
              * @return  0           success

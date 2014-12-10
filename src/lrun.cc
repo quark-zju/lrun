@@ -211,7 +211,7 @@ static void print_help(const string& submodule = "") {
             "  --tmpfs           path bytes  Mount writable tmpfs to specified `path` to hide filesystem subtree. `size` is in bytes. If it is 0, mount read-only."
             " This is performed after chroot. You should have write permission on `path`\n"
             "  --env             key value   Set environment variable before exec\n"
-            "  --cgroup-option   subsys k v  Apply cgroup setting before exec\n"
+            "  --cgroup-option   subsys k v  Apply cgroup setting before exec. Only root can use this\n"
             "  --fd              n           Do not close fd `n`\n"
             "  --cmd             cmd         Execute system command after tmpfs mounted. Only root can use this\n"
             "  --group           gid         Set additional groups. Applied to lrun itself. Only root can use this\n"
@@ -482,7 +482,7 @@ static void parse_cli_options(int argc, char * argv[]) {
             if (subsys_id >= 0) {
                 config.cgroup_options[make_pair((Cgroup::subsys_id_t)subsys_id, key)] = value;
             } else {
-                WARNING("cgroup option '%s' = '%s' ignored:"
+                WARNING("cgroup option '%s' = '%s' ignored: "
                         "subsystem '%s' not found",
                         key.c_str(), value.c_str(), subsys_name.c_str());
             }
@@ -594,7 +594,7 @@ static void check_config() {
 
     if (config.arg.argc <= 0) {
         error_messages.push_back(
-                "command_args can not be empty.\n"
+                "command_args cannot be empty. "
                 "Use `--help` to see full options.");
     }
 
@@ -634,7 +634,7 @@ static void check_config() {
         // restrict --remount-ro, only allows dest in --bindfs
         // because something like `--remount-ro /` affects outside world
         FOR_EACH(p, config.arg.remount_list) {
-            string dest = p.first;
+            const string& dest = p.first;
             if (!config.arg.bindfs_dest_set.count(dest)) {
                 error_messages.push_back(
                         "For security reason, `--remount-ro A` is only allowed "
@@ -652,19 +652,31 @@ static void check_config() {
             error_messages.push_back(
                     "Non-root users cannot set a negative value of `--nice`");
         }
+
+        if (!config.cgroup_options.empty()) {
+            error_messages.push_back(
+                    "Non-root users cannot use `--cgroup-option`");
+        }
+
+        FOR_EACH(p, config.cgroup_options) {
+            const string& key = p.first.second;
+            if (key.find("..") != string::npos || key.find("/") != string::npos) {
+                error_messages.push_back(
+                        "Invalid cgroup option key: `" + key + "`");
+            }
+        }
     }
 
     if (config.arg.syscall_list.empty() && config.arg.syscall_action == seccomp::action_t::DEFAULT_EPERM) {
         error_messages.push_back(
                 "Syscall filter forbids all syscalls, which is not allowed.");
-
     }
 
     if (error_messages.size() > 0) {
         FOR_EACH(message, error_messages) {
             fprintf(stderr, "%s\n\n", message.c_str());
         }
-        fprintf(stderr, "Please fix these errors and try again.\n");
+        fprintf(stderr, "Please fix above issues and try again.\n");
         exit(1);
     }
 }
