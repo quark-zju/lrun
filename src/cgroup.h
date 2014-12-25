@@ -189,9 +189,12 @@ namespace lrun {
              * freezer may attempt increase memory limit and
              * enable oom to get rid of D state processes.
              *
-             * @param   freeze     0: unfreeze. other: freeze
+             * @param   freeze      false: unfreeze. true: freeze
+             * @param   timeout     how many iterations before giving up
+             * @return  0           success
+             *          otherwise   failed
              */
-            void freeze(int freeze = 1);
+            int freeze(bool freeze = true, int timeout = 5);
 
             /**
              * get current memory usage

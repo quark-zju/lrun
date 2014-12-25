@@ -252,39 +252,37 @@ list<pid_t> Cgroup::get_pids() {
     return pids;
 }
 
-static const int FREEZE_INCREASE_MEM_LIMIT_STEP = 8192;  // 8 K
-static const useconds_t FREEZE_KILL_WAIT_INTERVAL = 10000;  // 10 ms
-static const int FREEZE_ATTEMPTS_BEFORE_ENABLE_OOM = 12;
+static const useconds_t LOOP_ITERATION_INTERVAL = 10000;  // 10 ms
 
-void Cgroup::freeze(int freeze) {
-    if (!valid()) return;
+int Cgroup::freeze(bool freeze, int timeout) {
+    if (!valid()) return -1;
     string freeze_state_path = subsys_path(CG_FREEZER) + "/freezer.state";
 
     if (!freeze) {
         INFO("unfreeze");
         fs::write(freeze_state_path, "THAWED\n");
-        return;
     } else {
         INFO("freezing");
         fs::write(freeze_state_path, "FROZEN\n");
 
-        for (int loop = 0, attempt = 0;; ++loop) {
+        for (;;) {
             int frozen = (strncmp(fs::read(freeze_state_path, 4).c_str(), "FRO", 3) == 0);
             if (frozen) break;
 
-            if (attempt < FREEZE_ATTEMPTS_BEFORE_ENABLE_OOM && attempt >= 0) {
-                INFO("increase memory limit by %d to \"help\" freezer", FREEZE_INCREASE_MEM_LIMIT_STEP);
-                set_memory_limit(memory_peak() + FREEZE_INCREASE_MEM_LIMIT_STEP);
-                ++attempt;
-            } else if (attempt >= 0)  {
+            timeout--;
+            if (timeout == 1) {
                 INFO("enabling OOM killer");
-                if (set(CG_MEMORY, "memory.oom_control", "0\n") == 0) attempt = -1;
+                set(CG_MEMORY, "memory.oom_control", "0\n");
+            } else if (timeout <= 0) {
+                INFO("giving up, not frozen");
+                return -2;
             }
 
-            usleep(FREEZE_KILL_WAIT_INTERVAL);
+            usleep(LOOP_ITERATION_INTERVAL);
         }
         INFO("confirmed frozen");
     }
+    return 0;
 }
 
 int Cgroup::empty() {
@@ -311,18 +309,23 @@ void Cgroup::killall() {
         set_memory_limit(-1);
         INFO("sent SIGKILL to init process %lu", (unsigned long)init_pid_);
         init_pid_ = 0;
-    } else {
-        freeze(1);
-        list<pid_t> pids = get_pids();
-        FOR_EACH(p, pids) kill(p, SIGKILL);
-        INFO("sent SIGKILLs to %lu processes", (unsigned long)pids.size());
-        freeze(0);
-    }
 
-    // wait and verify that processes are gone
-    for (int clear = 0; clear == 0;) {
-        if (empty()) break;
-        usleep(FREEZE_KILL_WAIT_INTERVAL);
+        // wait and verify that processes are gone
+        for (int clear = 0; clear == 0;) {
+            if (!valid() || empty()) break;
+            usleep(LOOP_ITERATION_INTERVAL);
+        }
+    } else {
+        // legacy (unreliable) way to kill processes, or not using a pid
+        // namespace
+        while (valid() && !empty()) {
+            freeze(true, 2);
+            list<pid_t> pids = get_pids();
+            FOR_EACH(p, pids) kill(p, SIGKILL);
+            INFO("sent SIGKILLs to %lu processes", (unsigned long)pids.size());
+            freeze(false, true);
+            if (!empty()) usleep(LOOP_ITERATION_INTERVAL);
+        }
     }
 
     INFO("confirmed processes are killed");
