@@ -43,7 +43,18 @@ inline void test_c_code(string code,  string expect, string lrun_flags = "") {
         assert(system("gcc " TMP_C " -o " TMP_EXE " >/dev/null 2>/dev/null") == 0);
         last_code = code;
     }
-    string cmd = string("lrun ") + lrun_flags + " -- " TMP_EXE " 3>&1 1>/dev/null 2>/dev/null";
+    string log_path = getenv("TEST_LOG") ? getenv("TEST_LOG") : "";
+    string cmd = string("lrun ")
+        + (getenv("LRUN_DEBUG") ? " --debug " : "")
+        + lrun_flags + " -- " TMP_EXE " 3>&1 ";
+    if (log_path.empty()) {
+        cmd += "1>>/dev/null 2>&1";
+    } else {
+        cmd += "1>>'" + string(getenv("TEST_LOG")) + "' 2>&1";
+        FILE *fp = fopen(getenv("TEST_LOG"), "a");
+        fprintf(fp, "\n----\nCode: %s\nRunning: %s\n", code.c_str(), cmd.c_str());
+        fclose(fp);
+    }
     fp = popen(cmd.c_str(), "r");
     assert(fp);
     string result;
@@ -106,7 +117,7 @@ TESTCASE(signal) {
                     c.flag);
         // this one may fail if pid namespace is not fully supported
         // and --isolate-process is true.
-        // do not report the bug if you are using linux < 3.8
+        // do not report a bug if you are using linux < 3.8
         test_c_code("main(){kill(getpid(), 33);}",
                     "TERMSIG  33",
                     c.flag);
@@ -114,6 +125,7 @@ TESTCASE(signal) {
 }
 
 TESTCASE(bad_progs) {
+    if (getenv("SKIP_SLOW_TESTS")) return;
     for_each_flag("--max-cpu-time 0.2") {
         test_c_code("main(){while(1);return 0;}",
                     "EXCEED   CPU_TIME",
