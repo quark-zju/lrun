@@ -185,7 +185,9 @@ static void print_help(const string& submodule = "") {
             "  --umask           int         Set umask\n"
             "  --uid             uid         Set uid (`uid` must > 0). Only root can use this\n"
             "  --gid             gid         Set gid (`gid` must > 0). Only root can use this\n"
-            "  --no-new-privs    bool        Do not allow getting higher privileges using exec. This disables things like sudo, ping, etc. Only root can set it to false. Require Linux >= 3.5\n";
+            "  --no-new-privs    bool        Do not allow getting higher privileges using exec. This disables things like sudo, ping, etc. Only root can set it to false. Require Linux >= 3.5\n"
+            "  --stdout-fd       int         Redirect child process stdout to specified fd\n"
+            "  --stderr-fd       int         Redirect child process stderr to specified fd\n";
         if (seccomp::supported()) options +=
             "  --syscalls        syscalls    Apply a syscall filter. "
             " `syscalls` is basically a list of syscall names separated by ',' with an optional prefix '!'. If prefix '!' exists, it's a blacklist otherwise a whitelist."
@@ -286,6 +288,8 @@ static void init_default_config() {
     config.arg.no_new_privs = true;
     config.arg.umount_outside = false;
     config.arg.clone_flags = 0;
+    config.arg.stdout_fd = STDOUT_FILENO;
+    config.arg.stderr_fd = STDERR_FILENO;
 
     // arg.rlimits settings
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
@@ -295,6 +299,14 @@ static void init_default_config() {
     config.arg.reset_env = 0;
     config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
     config.arg.syscall_list = "";
+}
+
+static int check_fd(int fd) {
+    if (fs::is_accessible("/proc/self/fd/" + strconv::from_long(fd))) {
+        return fd;
+    } else {
+        FATAL("fd %d is not accessible", fd)
+    };
 }
 
 static void parse_cli_options(int argc, char * argv[]) {
@@ -400,6 +412,12 @@ static void parse_cli_options(int argc, char * argv[]) {
         } else if (option == "no-new-privs") {
             REQUIRE_NARGV(1);
             config.arg.no_new_privs = NEXT_BOOL_ARG;
+        } else if (option == "stdout-fd") {
+            REQUIRE_NARGV(1);
+            config.arg.stdout_fd = check_fd(NEXT_LONG_LONG_ARG);
+        } else if (option == "stderr-fd") {
+            REQUIRE_NARGV(1);
+            config.arg.stderr_fd = check_fd(NEXT_LONG_LONG_ARG);
         } else if (option == "umount-outside") {
             REQUIRE_NARGV(1);
             config.arg.umount_outside = NEXT_BOOL_ARG;

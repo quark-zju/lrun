@@ -623,13 +623,39 @@ static void do_set_uts(const Cgroup::spawn_arg& arg) {
     // [[[end]]]
 }
 
+static void do_fd_redirect(int fd_dst, int fd_src) {
+    if (fd_src >= 0 && fd_src != fd_dst) {
+        INFO("dup2 %d %d", fd_src, fd_dst);
+        int ret = dup2(fd_src, fd_dst);
+        if (ret == -1) {
+            FATAL("cannot dup %d", fd_src);
+        }
+    }
+}
+
 static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
     // close fds other than 0,1,2 and sockets[0]
     INFO("close high fds");
     close(arg.sockets[1]);
     list<int> fds = get_fds();
+
+#ifndef NDEBUG
+    // make a copy of log fd because we may soon lose stderr
+    // this affects INFO, WARN, ERROR, FATAL
+    int flog_fd = dup(STDERR_FILENO);
+    fcntl(flog_fd, F_SETFD, fcntl(flog_fd, F_GETFD) | FD_CLOEXEC);
+    flog = fdopen(flog_fd, "a");
+#endif
+
+    do_fd_redirect(STDOUT_FILENO, arg.stdout_fd);
+    do_fd_redirect(STDERR_FILENO, arg.stderr_fd);
+
     FOR_EACH(fd, fds) {
-        if (fd != STDERR_FILENO && fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != arg.sockets[0] && arg.keep_fds.count(fd) == 0) {
+        if (fd != STDERR_FILENO && fd != STDIN_FILENO && fd != STDOUT_FILENO
+#ifndef NDEBUG
+                && fd != flog_fd
+#endif
+                && fd != arg.sockets[0] && arg.keep_fds.count(fd) == 0) {
             close(fd);
         }
     }

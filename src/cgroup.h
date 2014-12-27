@@ -260,6 +260,8 @@ namespace lrun {
                 std::string chroot_path;    // chroot path, empty if not need to chroot
                 std::string chdir_path;     // chdir path, empty if not need to chdir
                 std::string syscall_list;   // syscall whitelist or blacklist
+                int stdout_fd;              // redirect stdout to
+                int stderr_fd;              // redirect stderr to
                 struct {                    // set uts namespace strings
                     std::string sysname;
                     std::string nodename;

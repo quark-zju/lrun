@@ -76,6 +76,7 @@ extern double DEBUG_START_TIME;
 extern int DEBUG_TIMESTAMP;
 extern int DEBUG_PROGRESS;
 extern int DEBUG_PID;
+extern FILE* flog;
 struct ScopedLogLock {
     ScopedLogLock();
     ~ScopedLogLock();
@@ -84,27 +85,27 @@ struct ScopedLogLock {
 
 # define SCOPED_LOG_LOCK ScopedLogLock lock;
 # define SHOW_SOURCE_LOCATION \
-    if (DEBUG_ENABLED) fprintf(stderr, "  at %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+    if (DEBUG_ENABLED && flog) fprintf(flog, "  at %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 # define PRINT_TIMESTAMP \
     {   \
-      if (DEBUG_TIMESTAMP) fprintf(stderr, "[%8.3f]", TIMESTAMP); \
-      if (DEBUG_PID) fprintf(stderr, "[%6lu] ", (unsigned long)getpid()); \
+      if (DEBUG_TIMESTAMP && flog) fprintf(flog, "[%8.3f]", TIMESTAMP); \
+      if (DEBUG_PID && flog) fprintf(flog, "[%6lu] ", (unsigned long)getpid()); \
     }
 # define INFO(...) \
-    if (__builtin_expect(DEBUG_ENABLED, 0)) { \
+    if (__builtin_expect(DEBUG_ENABLED && flog, 0)) { \
         ScopedLogLock lock;\
         PRINT_TIMESTAMP; \
-        fprintf(stderr, "INFO: "); \
-        fprintf(stderr, __VA_ARGS__); \
-        fprintf(stderr, "\n"); \
-        fflush(stderr); \
+        fprintf(flog, "INFO: "); \
+        fprintf(flog, __VA_ARGS__); \
+        fprintf(flog, "\n"); \
+        fflush(flog); \
     }
 # define PROGRESS_INFO(...) \
-    if (__builtin_expect(DEBUG_PROGRESS, 0)) { \
+    if (__builtin_expect(DEBUG_PROGRESS && flog, 0)) { \
         SCOPED_LOG_LOCK; \
-        fprintf(stderr, __VA_ARGS__); \
-        fprintf(stderr, "        \r"); \
-        fflush(stderr); \
+        fprintf(flog, __VA_ARGS__); \
+        fprintf(flog, "        \r"); \
+        fflush(flog); \
     }
 # define DEBUG_DO if (DEBUG_ENABLED)
 #endif
@@ -117,12 +118,13 @@ struct ScopedLogLock {
     { \
         SCOPED_LOG_LOCK; \
         PRINT_TIMESTAMP; \
-        fprintf(stderr, "FATAL: "); \
-        fprintf(stderr, __VA_ARGS__); \
-        if (errno) fprintf(stderr, " (%s)", strerror(errno)); \
-        fprintf(stderr, "\n"); \
+        FILE* fp = flog ? flog : stderr; \
+        fprintf(fp, "FATAL: "); \
+        fprintf(fp, __VA_ARGS__); \
+        if (errno) fprintf(fp ? fp : stderr, " (%s)", strerror(errno)); \
+        fprintf(fp, "\n"); \
         SHOW_SOURCE_LOCATION; \
-        fflush(stderr); \
+        fflush(fp); \
         exit(-1); \
     }
 
@@ -130,23 +132,25 @@ struct ScopedLogLock {
     { \
         SCOPED_LOG_LOCK; \
         PRINT_TIMESTAMP; \
-        fprintf(stderr, "ERROR: "); \
-        fprintf(stderr, __VA_ARGS__); \
-        if (errno) fprintf(stderr, " (%s)", strerror(errno)); \
-        fprintf(stderr, "\n"); \
+        FILE* fp = flog ? flog : stderr; \
+        fprintf(fp, "ERROR: "); \
+        fprintf(fp, __VA_ARGS__); \
+        if (errno) fprintf(fp, " (%s)", strerror(errno)); \
+        fprintf(fp, "\n"); \
         SHOW_SOURCE_LOCATION; \
-        fflush(stderr); \
+        fflush(fp); \
     }
 
 #define WARNING(...) \
     { \
         SCOPED_LOG_LOCK; \
         PRINT_TIMESTAMP; \
-        fprintf(stderr, "WARNING: "); \
-        fprintf(stderr, __VA_ARGS__); \
-        fprintf(stderr, "\n"); \
+        FILE* fp = flog ? flog : stderr; \
+        fprintf(fp, "WARNING: "); \
+        fprintf(fp, __VA_ARGS__); \
+        fprintf(fp, "\n"); \
         SHOW_SOURCE_LOCATION; \
-        fflush(stderr); \
+        fflush(fp); \
     }
 
 // old compiler does not like for (auto i : v)

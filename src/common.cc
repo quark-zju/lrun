@@ -34,6 +34,7 @@ int DEBUG_PID = 0;
 int DEBUG_TIMESTAMP = 0;
 int DEBUG_PROGRESS = 0;
 double DEBUG_START_TIME = 0;
+FILE *flog = stderr;
 
 
 static char log_lock_path[80];
