@@ -310,7 +310,7 @@ void Cgroup::killall() {
         INFO("sent SIGKILL to init process %lu", (unsigned long)init_pid_);
         init_pid_ = 0;
 
-        // wait and verify that processes are gone
+        // wait and confirm that processes are gone
         for (int clear = 0; clear == 0;) {
             if (!valid() || empty()) break;
             usleep(LOOP_ITERATION_INTERVAL);
@@ -935,6 +935,7 @@ static int clone_main_fn(void * clone_arg) {
     do_apply_rlimits(arg);
     do_set_env(arg);
     do_renice(arg);
+    do_set_new_privs(arg);
 
     // all prepared! blocking, wait for parent
     INFO("waiting for parent");
@@ -955,12 +956,10 @@ static int clone_main_fn(void * clone_arg) {
         return -1;
     }
 
-    // exec target
+    // exec target. syscall filter must be done just before execve because we need other
+    // syscalls in above code.
     INFO("will execvp %s ...", arg.args[0]);
-
-    do_set_new_privs(arg);
     do_seccomp(arg);
-
     execvp(arg.args[0], arg.args);
 
     // exec failed, output to stderr

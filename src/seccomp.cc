@@ -80,7 +80,7 @@ sc::Rules::Rules(action_t default_action, uint64_t execve_arg1) {
     if (ctx == NULL) ERROR("seccomp_init");
 }
 
-// return length
+// save parsed result to result and return string length
 static int read_uint64(const char * s, uint64_t& result) {
     int len = 0;
     static const int MAX_LEN = 1023;
@@ -149,7 +149,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
 
     reset_syscall_rule;
 
-    // add seccomp rules
+    // parse syscall filter string
     for (char c = *(p = filter); ; c = *(++p)) {
         if (c == 0) c = ',';  // easy way to handle last char
         if (c == '[') {
@@ -264,7 +264,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
     }
 
     if (!execve_handled && scmp_action_ != SCMP_ACT_ALLOW && execve_arg1_) {
-        // a whitelist with no execve yet, add execve that only allows ours call
+        // a whitelist with no execve yet, add execve that only allows ours execve
         reset_syscall_rule;
         current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_EQ, execve_arg1_, /* not used */ 0));
         int ret = seccomp_rule_add_array(ctx, SCMP_ACT_ALLOW, execve_no, current_arg_array.size(), current_arg_array.data());
