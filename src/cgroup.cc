@@ -633,30 +633,37 @@ static void do_fd_redirect(int fd_dst, int fd_src) {
     }
 }
 
-static void do_close_high_fds(const Cgroup::spawn_arg& arg) {
-    // close fds other than 0,1,2 and sockets[0]
-    INFO("close high fds");
+static void fd_set_cloexec(int fd, int enforce = 1) {
+    if (fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC)) {
+        if (enforce) {
+            FATAL("fcntl %d failed", fd);
+        } else {
+            // fd can become invalid across namespaces
+            close(fd);
+        }
+    }
+}
+
+static void do_process_fds(const Cgroup::spawn_arg& arg) {
+    // this is for parent process
     close(arg.sockets[1]);
-    list<int> fds = get_fds();
 
 #ifndef NDEBUG
     // make a copy of log fd because we may soon lose stderr
     // this affects INFO, WARN, ERROR, FATAL
     int flog_fd = dup(STDERR_FILENO);
-    fcntl(flog_fd, F_SETFD, fcntl(flog_fd, F_GETFD) | FD_CLOEXEC);
     flog = fdopen(flog_fd, "a");
 #endif
 
     do_fd_redirect(STDOUT_FILENO, arg.stdout_fd);
     do_fd_redirect(STDERR_FILENO, arg.stderr_fd);
 
+    INFO("applying FD_CLOEXEC");
+    list<int> fds = get_fds();
     FOR_EACH(fd, fds) {
         if (fd != STDERR_FILENO && fd != STDIN_FILENO && fd != STDOUT_FILENO
-#ifndef NDEBUG
-                && fd != flog_fd
-#endif
-                && fd != arg.sockets[0] && arg.keep_fds.count(fd) == 0) {
-            close(fd);
+                && arg.keep_fds.count(fd) == 0) {
+            fd_set_cloexec(fd, 0 /* close that fd on error */);
         }
     }
 }
@@ -918,7 +925,7 @@ static int clone_main_fn(void * clone_arg) {
     do_set_sysctl();
 #endif
     do_set_uts(arg);
-    do_close_high_fds(arg);
+    do_process_fds(arg);
     do_privatize_filesystem(arg);
     do_umount_outside_chroot(arg);
     do_mount_proc(arg);
@@ -951,10 +958,7 @@ static int clone_main_fn(void * clone_arg) {
 
     // not closing sockets[0] here, it will closed on exec
     // if exec fails, it will be closed upon process exit (aka. this function returns)
-    if (fcntl(arg.sockets[0], F_SETFD, FD_CLOEXEC)) {
-        FATAL("fcntl failed");
-        return -1;
-    }
+    fd_set_cloexec(arg.sockets[0]);
 
     // exec target. syscall filter must be done just before execve because we need other
     // syscalls in above code.
@@ -1119,8 +1123,8 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     }
 
     // sockets fds should expire when exec
-    fcntl(arg.sockets[0], F_SETFD, FD_CLOEXEC);
-    fcntl(arg.sockets[1], F_SETFD, FD_CLOEXEC);
+    fd_set_cloexec(arg.sockets[0]);
+    fd_set_cloexec(arg.sockets[1]);
 
     pid_t child_pid;
     child_pid = clone(clone_main_fn, (void*)((char*)alloca(stack_size) + stack_size), clone_flags, &arg);
