@@ -20,6 +20,7 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
+#include "common.h"
 #include "fs.h"
 #include <cassert>
 #include <cerrno>
@@ -362,4 +363,50 @@ int fs::Tracer::get_fan_fd() const {
 
 fs::Tracer::~Tracer() {
     if (fan_fd_ >= 0) close(fan_fd_);
+}
+
+fs::PathNode::PathNode() {
+    flag_ = 0;
+}
+
+fs::PathNode::~PathNode() {
+    FOR_EACH(p, this->children_) {
+        if (p.second != NULL) {
+            delete p.second;
+            p.second = NULL;
+        }
+    }
+}
+
+fs::PathNode* fs::PathNode::walk(const char *p, int ttl) {
+    if (ttl == 0) return this;
+
+    fs::PathNode *next;
+    if (children_.count(*p) == 0) {
+        next = children_[*p] = new fs::PathNode();
+    } else {
+        next = children_[*p];
+    }
+    return next->walk(p + 1, ttl - 1);
+}
+
+
+void fs::PathNode::set(const char path[], int flag, int wildcard) {
+    int ttl = strlen(path);
+    if (!wildcard) ttl += 1;  // including the last char ('\0')
+    walk(path, ttl)->flag_ = flag;
+}
+
+int fs::PathNode::get(const char path[]) {
+    const char *p = &path[0];
+    const char *p_end = path + strlen(path) + 1;
+    int flag = 0;
+
+    for (fs::PathNode *current = this; current;) {
+        if (current->flag_) flag = current->flag_;
+        if (p == p_end) break;  // just processed the last char, '\0'
+        __typeof(current->children_.begin()) it = current->children_.find(*p++);
+        if (it == current->children_.end()) current = NULL; else current = it->second;
+    }
+    return flag;
 }

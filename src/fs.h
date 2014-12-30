@@ -24,6 +24,7 @@
 
 #include <fcntl.h>
 #include <string>
+#include <map>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <sys/fanotify.h>
@@ -244,6 +245,20 @@ namespace lrun {
             private:
                 int fan_fd_;
                 tracer_cb *cb_;
+        };
+
+        class PathNode {
+            public:
+                void set(const char path[], int flag, int wildcard = 0);
+                int get(const char path[]);
+
+                PathNode();
+                ~PathNode();
+
+            private:
+                PathNode* walk(const char *p, int ttl);
+                std::map<char, PathNode*> children_;
+                int flag_;
         };
     }
 }
