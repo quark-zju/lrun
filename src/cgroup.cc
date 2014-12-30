@@ -252,6 +252,30 @@ list<pid_t> Cgroup::get_pids() {
     return pids;
 }
 
+bool Cgroup::has_pid(pid_t pid) {
+    bool result = false;
+
+    char path[sizeof(long) * 3 + sizeof("/proc//cgroup")];
+    snprintf(path, sizeof(path), "/proc/%ld/cgroup", (long)pid);
+    FILE *fp = fopen(path, "r");
+    if (!fp) return false;
+
+    size_t len = 0;
+    char *line = NULL;
+    char buf[64];  // FIXME cgroup name is 63 chars long
+    while (getline(&line, &len, fp) != -1) {
+        // the line should look like:
+        // 4:memory:/cgname
+        if (sscanf(line, "%*d:memory:/%63s", buf) != 1)
+            continue;
+        result = (strncmp(name_.c_str(), buf, sizeof(buf)) == 0);
+        break;
+    }
+    if (line) free(line);
+    fclose(fp);
+    return result;
+}
+
 static const useconds_t LOOP_ITERATION_INTERVAL = 10000;  // 10 ms
 
 int Cgroup::freeze(bool freeze, int timeout) {

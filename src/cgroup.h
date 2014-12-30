@@ -178,6 +178,13 @@ namespace lrun {
             int empty();
 
             /**
+             * check if a process is in this cgroup
+             * @return  true        the process is in this cgroup
+             *          false       otherwise
+             */
+            bool has_pid(pid_t pid);
+
+            /**
              * kill all tasks until no more tasks alive.
              * the method will block until all tasks are confirmed gone.
              */
