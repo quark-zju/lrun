@@ -56,6 +56,7 @@ static struct {
     bool enable_network;
     bool enable_pidns;
     bool pass_exitcode;
+    bool write_result_to_3;
     useconds_t interval;
     string cgname;
     Cgroup* active_cgroup;
@@ -275,6 +276,7 @@ static void init_default_config() {
     config.interval = (useconds_t)(0.02 * 1000000);
     config.active_cgroup = NULL;
     config.pass_exitcode = false;
+    config.write_result_to_3 = fs::is_accessible("/proc/self/fd/3", F_OK);
 
     // arg settings
     config.arg.nice = 0;
@@ -1013,11 +1015,14 @@ static int run_command() {
             WTERMSIG(stat),
             exceeded_limit.empty() ? "none" : exceeded_limit.c_str());
 
-    int ret = write(3, status_report, strlen(status_report));
-    (void)ret;
+    if (config.write_result_to_3) {
+        int ret = write(3, status_report, strlen(status_report));
+        (void)ret;
 
-    // close output earlier so the process read the status can start to do other things.
-    close(3);
+        // close output earlier (before clean_cg_exit)
+        // so the process read the status can start to do other things.
+        close(3);
+    }
 
     return config.pass_exitcode ? WEXITSTATUS(stat) : EXIT_SUCCESS;
 }
