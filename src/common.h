@@ -153,6 +153,8 @@ struct ScopedLogLock {
         fflush(fp); \
     }
 
+#define ensure_zero(exp) { if ((exp) != 0) FATAL("%s", "failed: " # exp); }
+
 // old compiler does not like for (auto i : v)
 #if (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6))
 # define FOR_EACH_CONST(i, v) \

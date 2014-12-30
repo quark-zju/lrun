@@ -160,6 +160,7 @@ rule '.o' => '.cc' do |t|
            try_cxxflags(['-D_FORTIFY_SOURCE=2'], '-D_FORTIFY_SOURCE'),
            try_cxxflags(['-Os'], '-O'),
            CXXFLAGS, NODEBUG_FLAG, NOLIBSF_FLAG,
+           '-pthread',
            "-DLIBSECCOMP_VERSION_MAJOR=#{NOSECCOMP ? 0 : get_libseccomp_version}",
            "-DVERSION=\\\"#{get_version}\\\"",
            get_libseccomp_cflags].join(' ')
@@ -169,7 +170,7 @@ end
 
 file BIN => OBJ do |t|
   require_executable! LD
-  sh "#{LD} #{LDFLAGS} -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs} #{get_other_libs}"
+  sh "#{LD} #{LDFLAGS} -pthread -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs} #{get_other_libs}"
 end
 
 task :lrun_group do |t|

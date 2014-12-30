@@ -40,6 +40,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <pthread.h>
 
 using namespace lrun;
 
@@ -66,6 +67,7 @@ static struct {
 } config;
 
 static volatile sig_atomic_t signal_triggered = 0;
+static pthread_t fs_tracer_thread_id;
 
 static int get_terminal_width() {
     struct winsize ts;
@@ -735,6 +737,9 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
     }
 
     if (config.arg.fs_tracer) {
+        if (fs_tracer_thread_id) {
+            pthread_cancel(fs_tracer_thread_id);
+        }
         delete config.arg.fs_tracer;
         config.arg.fs_tracer = NULL;
     }
@@ -813,13 +818,30 @@ static int fs_trace_callback(const char path[], int fd, pid_t pid, uint64_t mask
     return 0;
 }
 
+static void * fs_tracer_thread(void *data) {
+    fs::Tracer *tracer = (fs::Tracer*) data;
+    if (!tracer) return 0;
+    while (1) {
+        INFO("tracer before process event");
+        tracer->process_events();
+    }
+    return NULL;
+}
+
 static void create_fs_tracer() {
     config.arg.fs_tracer = new fs::Tracer();
     if (config.arg.fs_tracer->init(
-                FAN_CLASS_PRE_CONTENT | FAN_CLOEXEC | FAN_NONBLOCK | FAN_UNLIMITED_QUEUE,
+                FAN_CLASS_PRE_CONTENT | FAN_CLOEXEC | FAN_UNLIMITED_QUEUE,
                 O_RDWR | O_CLOEXEC,
                 &fs_trace_callback)) {
         FATAL("can not init filesystem tracer");
+    } else {
+        INFO("starting fs tracer thread");
+        pthread_attr_t attr;
+        ensure_zero(pthread_attr_init(&attr));
+        ensure_zero(pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED));
+        pthread_create(&fs_tracer_thread_id, NULL, &fs_tracer_thread, (void*) config.arg.fs_tracer);
+        ensure_zero(pthread_attr_destroy(&attr));
     }
 }
 
@@ -989,11 +1011,6 @@ static int run_command() {
         } else {
             PROGRESS_INFO("CPU %4.2f | REAL %4.1f | MEM %4.2f / %4.2fM",
             cg.cpu_usage(), now() - start_time, cg.memory_current() / 1.e6, cg.memory_peak() / 1.e6);
-        }
-
-        // process pending fs tracer events
-        if (config.arg.fs_tracer) {
-            config.arg.fs_tracer->process_events();
         }
 
         // sleep for a while
