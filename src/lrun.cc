@@ -116,10 +116,10 @@ static void print_help(const string& submodule = "") {
 
     if (submodule == "syscalls") {
         content = line_wrap(
-            "--syscall FILTER_STRING\n"
+            "--syscalls FILTER_STRING\n"
             "  Default action for unlisted syscalls is to return EPERM.\n"
             "\n"
-            "--syscall !FILTER_STRING\n"
+            "--syscalls !FILTER_STRING\n"
             "  Default action for unlisted syscalls is to allow.\n"
             "\n"
             , width, 2);
