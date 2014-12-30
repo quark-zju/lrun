@@ -292,6 +292,7 @@ static void init_default_config() {
     config.arg.clone_flags = 0;
     config.arg.stdout_fd = STDOUT_FILENO;
     config.arg.stderr_fd = STDERR_FILENO;
+    config.arg.fs_tracer = NULL;
 
     // arg.rlimits settings
     config.arg.rlimits[RLIMIT_NOFILE] = 256;
@@ -733,6 +734,11 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
         cg.killall();
     }
 
+    if (config.arg.fs_tracer) {
+        delete config.arg.fs_tracer;
+        config.arg.fs_tracer = NULL;
+    }
+
     exit(exit_code);
 }
 
@@ -800,6 +806,21 @@ static void create_cgroup() {
 
     if (!new_cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
     config.active_cgroup = &new_cg;
+}
+
+static int fs_trace_callback(const char path[], int fd, pid_t pid, uint64_t mask) {
+    INFO("trace %s", path);
+    return 0;
+}
+
+static void create_fs_tracer() {
+    config.arg.fs_tracer = new fs::Tracer();
+    if (config.arg.fs_tracer->init(
+                FAN_CLASS_PRE_CONTENT | FAN_CLOEXEC | FAN_NONBLOCK | FAN_UNLIMITED_QUEUE,
+                O_RDWR | O_CLOEXEC,
+                &fs_trace_callback)) {
+        FATAL("can not init filesystem tracer");
+    }
 }
 
 static void setup_cgroup() {
@@ -970,6 +991,11 @@ static int run_command() {
             cg.cpu_usage(), now() - start_time, cg.memory_current() / 1.e6, cg.memory_peak() / 1.e6);
         }
 
+        // process pending fs tracer events
+        if (config.arg.fs_tracer) {
+            config.arg.fs_tracer->process_events();
+        }
+
         // sleep for a while
         usleep(config.interval);
     }
@@ -1039,6 +1065,7 @@ int main(int argc, char * argv[]) {
     INFO("lrun %s pid = %d", VERSION, (int)getpid());
 
     create_cgroup();
+    create_fs_tracer();
 
     {
         Cgroup& cg = *config.active_cgroup;
