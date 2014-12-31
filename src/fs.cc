@@ -370,10 +370,10 @@ fs::PathNode::PathNode() {
 }
 
 fs::PathNode::~PathNode() {
-    FOR_EACH(p, this->children_) {
-        if (p.second != NULL) {
-            delete p.second;
-            p.second = NULL;
+    for (std::map<char, fs::PathNode*>::iterator it = this->children_.begin(); it != this->children_.end(); ++it) {
+        if (it->second != NULL) {
+            if (it->second != this) delete it->second;
+            it->second = NULL;
         }
     }
 }
