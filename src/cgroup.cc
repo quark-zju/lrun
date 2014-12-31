@@ -28,7 +28,6 @@
 #include <list>
 #include <dirent.h>
 #include <fcntl.h>
-#include <mntent.h>
 #include <sched.h>
 #include <signal.h>
 #include <sys/mount.h>
@@ -74,32 +73,6 @@ int Cgroup::subsys_id_from_name(const char * const name) {
     return -1;
 }
 
-typedef struct {
-    string type;
-    string opts;
-    string fsname;
-    string dir;
-} mount_entrie;
-
-static std::map<string, mount_entrie> get_mounts() {
-    std::map<string, mount_entrie> result;
-    FILE *fp = setmntent(fs::MOUNTS_PATH, "r");
-    if (!fp) {
-        FATAL("can not read %s", fs::MOUNTS_PATH);
-        return result;
-    }
-    for (struct mntent *ent; (ent = getmntent(fp));) {
-        result[string(ent->mnt_dir)] = {
-            /* .type = */ ent->mnt_type,
-            /* .opts = */ ent->mnt_opts,
-            /* .fsname = */ ent->mnt_fsname,
-            /* .dir = */ ent->mnt_dir
-        };
-    }
-    endmntent(fp);
-    return result;
-}
-
 string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
     {
         // FIXME cache may not work when user manually umount cgroup
@@ -112,9 +85,9 @@ string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
     const char * MNT_DEST_BASE_PATH = "/sys/fs/cgroup";
     const char * subsys_name = subsys_names[subsys_id];
 
-    std::map<string, mount_entrie> mounts = get_mounts();
+    std::map<string, fs::MountEntry> mounts = fs::get_mounts();
     FOR_EACH_CONST(p, mounts) {
-        const mount_entrie& ent = p.second;
+        const fs::MountEntry& ent = p.second;
         if (ent.type != string(fs::TYPE_CGROUP)) continue;
         if (strstr(ent.opts.c_str(), subsys_name)) {
             INFO("cgroup %s path = '%s'", subsys_name, ent.dir.c_str());
@@ -518,7 +491,7 @@ static void do_umount_outside_chroot(const Cgroup::spawn_arg& arg) {
     if (!arg.umount_outside) return;
     if (arg.chroot_path.empty()) return;
 
-    std::map<string, mount_entrie> mounts = get_mounts();
+    std::map<string, fs::MountEntry> mounts = fs::get_mounts();
     list<string> umount_list;
     FOR_EACH(p, mounts) {
         const string& dest = p.second.dir;

@@ -20,7 +20,6 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "common.h"
 #include "fs.h"
 #include <cassert>
 #include <cerrno>
@@ -30,6 +29,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <list>
+#include <mntent.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
@@ -280,6 +280,23 @@ int fs::umount(const string& dest, bool lazy) {
     } else {
         return umount(dest.c_str());
     }
+}
+
+std::map<string, fs::MountEntry> fs::get_mounts() {
+    std::map<string, fs::MountEntry> result;
+    FILE *fp = setmntent(fs::MOUNTS_PATH, "r");
+    if (!fp) return result;
+
+    for (struct mntent *ent; (ent = getmntent(fp));) {
+        result[string(ent->mnt_dir)] = {
+            /* .type = */ ent->mnt_type,
+            /* .opts = */ ent->mnt_opts,
+            /* .fsname = */ ent->mnt_fsname,
+            /* .dir = */ ent->mnt_dir
+        };
+    }
+    endmntent(fp);
+    return result;
 }
 
 fs::ScopedFileLock::ScopedFileLock(const char path[]) {

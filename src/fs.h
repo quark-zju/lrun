@@ -213,6 +213,17 @@ namespace lrun {
          */
         int umount(const std::string& dest, bool lazy = true);
 
+        struct MountEntry {
+            std::string type;
+            std::string opts;
+            std::string fsname;
+            std::string dir;
+        };
+
+        std::map<std::string, MountEntry> get_mounts();
+
+        std::string get_mount_point(const std::string& path);
+
         class ScopedFileLock {
             public:
                 ScopedFileLock(const char path[]);
