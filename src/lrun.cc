@@ -730,18 +730,21 @@ static double now() {
 static void clean_cg_exit(Cgroup& cg, int exit_code) {
     INFO("cleaning and exiting with code = %d", exit_code);
 
+    if (config.arg.fs_tracer) {
+        // pre-kill
+        cg.killall(false /* confirm */);
+        if (fs_tracer_thread_id) {
+            pthread_cancel(fs_tracer_thread_id);
+            fs_tracer_thread_id = 0;
+        }
+        delete config.arg.fs_tracer;
+        config.arg.fs_tracer = NULL;
+    }
+
     if (config.cgname.empty()) {
         if (cg.destroy()) WARNING("can not destroy cgroup");
     } else {
         cg.killall();
-    }
-
-    if (config.arg.fs_tracer) {
-        if (fs_tracer_thread_id) {
-            pthread_cancel(fs_tracer_thread_id);
-        }
-        delete config.arg.fs_tracer;
-        config.arg.fs_tracer = NULL;
     }
 
     exit(exit_code);
@@ -821,8 +824,8 @@ static int fs_trace_callback(const char path[], int fd, pid_t pid, uint64_t mask
 static void * fs_tracer_thread(void *data) {
     fs::Tracer *tracer = (fs::Tracer*) data;
     if (!tracer) return 0;
+    pthread_setname_np(pthread_self(), "lrun:fstracer");
     while (1) {
-        INFO("tracer before process event");
         tracer->process_events();
     }
     return NULL;
@@ -835,14 +838,14 @@ static void create_fs_tracer() {
                 O_RDWR | O_CLOEXEC,
                 &fs_trace_callback)) {
         FATAL("can not init filesystem tracer");
-    } else {
-        INFO("starting fs tracer thread");
-        pthread_attr_t attr;
-        ensure_zero(pthread_attr_init(&attr));
-        ensure_zero(pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED));
-        pthread_create(&fs_tracer_thread_id, NULL, &fs_tracer_thread, (void*) config.arg.fs_tracer);
-        ensure_zero(pthread_attr_destroy(&attr));
     }
+    INFO("starting fs tracer thread");
+    pthread_attr_t attr;
+    ensure_zero(pthread_attr_init(&attr));
+    // the thread must be joinable so that we can reliably use pthread_kill to detect if it is alive
+    ensure_zero(pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE));
+    pthread_create(&fs_tracer_thread_id, NULL, &fs_tracer_thread, (void*) config.arg.fs_tracer);
+    ensure_zero(pthread_attr_destroy(&attr));
 }
 
 static void setup_cgroup() {
@@ -944,6 +947,13 @@ static int run_command() {
             fprintf(stderr, "Receive signal %d, exiting...\n", signal_triggered);
             fflush(stderr);
             clean_cg_exit(cg, 4);
+        }
+
+        // check fs tracer thread
+        if (fs_tracer_thread_id && pthread_kill(fs_tracer_thread_id, 0) != 0) {
+            fprintf(stderr, "Filesystem tracer thread was killed, exiting...\n");
+            fflush(stderr);
+            clean_cg_exit(cg, 5);
         }
 
         // check stat

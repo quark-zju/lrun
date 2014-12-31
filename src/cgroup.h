@@ -186,9 +186,11 @@ namespace lrun {
 
             /**
              * kill all tasks until no more tasks alive.
-             * the method will block until all tasks are confirmed gone.
+             *
+             * @param   confirm     true: block until all tasks are confirmed gone
+             *                      false: just send kill, do not confirm
              */
-            void killall();
+            void killall(bool confirm = true);
 
             /**
              * use freezer cgroup subsystem to freeze processes

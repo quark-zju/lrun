@@ -314,30 +314,29 @@ int Cgroup::empty() {
     return fs::read(procs_path, 4).empty() ? 1 : 0;
 }
 
-void Cgroup::killall() {
-
-    // return immediately if cgroup is not valid
-    if (!valid()) return;
-
-    // check procs_path first, return if empty
-    if (empty()) return;
+void Cgroup::killall(bool confirm) {
+    if (!valid() || empty()) return;
 
     if (init_pid_) {
-        // if init pid exists, just kill it and the kernel will kill all
-        // remaining processes in the same pid ns.
-        // because our init process (clone_init_fn) won't allocate memory,
-        // it will not enter D state and is safe to kill.
-        kill(init_pid_, SIGKILL);
-        // cancel memory limit. this will wake up some D state processes,
-        // which are allocating memory and reached memory limit.
-        set_memory_limit(-1);
-        INFO("sent SIGKILL to init process %lu", (unsigned long)init_pid_);
-        init_pid_ = 0;
+        if (init_pid_ > 0) {
+            // if init pid exists, just kill it and the kernel will kill all
+            // remaining processes in the same pid ns.
+            // because our init process (clone_init_fn) won't allocate memory,
+            // it will not enter D state and is safe to kill.
+            kill(init_pid_, SIGKILL);
+            // cancel memory limit. this will wake up some D state processes,
+            // which are allocating memory and reached memory limit.
+            set_memory_limit(-1);
+            INFO("sent SIGKILL to init process %lu", (unsigned long)init_pid_);
+            init_pid_ = -1;
+        }
 
-        // wait and confirm that processes are gone
-        for (int clear = 0; clear == 0;) {
-            if (!valid() || empty()) break;
-            usleep(LOOP_ITERATION_INTERVAL);
+        if (confirm) {
+            // wait and confirm that processes are gone
+            for (int clear = 0; clear == 0;) {
+                if (!valid() || empty()) break;
+                usleep(LOOP_ITERATION_INTERVAL);
+            }
         }
     } else {
         // legacy (unreliable) way to kill processes, or not using a pid
@@ -347,12 +346,11 @@ void Cgroup::killall() {
             list<pid_t> pids = get_pids();
             FOR_EACH(p, pids) kill(p, SIGKILL);
             INFO("sent SIGKILLs to %lu processes", (unsigned long)pids.size());
-            freeze(false, true);
+            if (!confirm) break;
+            freeze(false, 1);
             if (!empty()) usleep(LOOP_ITERATION_INTERVAL);
         }
     }
-
-    INFO("confirmed processes are killed");
 
     return;
 }
