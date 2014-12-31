@@ -299,6 +299,21 @@ std::map<string, fs::MountEntry> fs::get_mounts() {
     return result;
 }
 
+std::string get_mount_point(const std::string& path) {
+  string result = "/";
+  static std::map<string, fs::MountEntry> mounts;
+  if (mounts.empty()) mounts = fs::get_mounts();
+
+  for (__typeof(mounts.begin()) it = mounts.begin(); it != mounts.end(); ++it) {
+    if (it->second.type == "lofs") continue;
+    if (it->first.length() > result.length() && path.substr(0, it->first.length()) == it->first) {
+      result = it->first;
+    }
+  }
+
+  return result;
+}
+
 fs::ScopedFileLock::ScopedFileLock(const char path[]) {
     int fd = open(path, O_RDONLY);
     if (fd < 0) return;
