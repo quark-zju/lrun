@@ -23,35 +23,34 @@
 #include "strconv.h"
 #include <cstdio>
 
-namespace conv = lrun::strconv;
 using std::string;
 
 
-double conv::to_double(const string& str) {
+double strconv::to_double(const string& str) {
     double v = 0;
     sscanf(str.c_str(), "%lg", &v);
     return v;
 }
 
-long conv::to_long(const string& str) {
+long strconv::to_long(const string& str) {
     long v = 0;
     sscanf(str.c_str(), "%ld", &v);
     return v;
 }
 
-unsigned long conv::to_ulong(const string& str) {
+unsigned long strconv::to_ulong(const string& str) {
     unsigned long v = 0;
     sscanf(str.c_str(), "%lu", &v);
     return v;
 }
 
-long long conv::to_longlong(const string& str) {
+long long strconv::to_longlong(const string& str) {
     long long v = 0;
     sscanf(str.c_str(), "%lld", &v);
     return v;
 }
 
-bool conv::to_bool(const string& str) {
+bool strconv::to_bool(const string& str) {
     if (str.empty()) return false;
     switch (str.c_str()[0]) {
         case '1': case 't': case 'T': case 'e': case 'E':
@@ -61,7 +60,7 @@ bool conv::to_bool(const string& str) {
     }
 }
 
-long long conv::to_bytes(const string& str) {
+long long strconv::to_bytes(const string& str) {
     long long result = 1;
     // accept str which ends with 'k', 'kb', 'm', 'M', etc.
     int pos = str.length() - 1;
@@ -78,15 +77,15 @@ long long conv::to_bytes(const string& str) {
     }
     if (result == 1) {
         // read as long long
-        result = conv::to_longlong(str);
+        result = strconv::to_longlong(str);
     } else {
         // read as double so that the user can use things like 0.5mb
-        result *= conv::to_double(str);
+        result *= strconv::to_double(str);
     }
     return result;
 }
 
-string conv::from_double(double value, int precision) {
+string strconv::from_double(double value, int precision) {
     char buf[1024];
     char format[16];
     snprintf(format, sizeof format, "%%.%df", precision);
@@ -94,19 +93,19 @@ string conv::from_double(double value, int precision) {
     return buf;
 }
 
-string conv::from_long(long value) {
+string strconv::from_long(long value) {
     char buf[sizeof(long) * 3 + 1];
     snprintf(buf, sizeof buf, "%ld", value);
     return buf;
 }
 
-string conv::from_ulong(unsigned long value) {
+string strconv::from_ulong(unsigned long value) {
     char buf[sizeof(unsigned long) * 3 + 1];
     snprintf(buf, sizeof buf, "%lu", value);
     return buf;
 }
 
-string conv::from_longlong(long long value) {
+string strconv::from_longlong(long long value) {
     char buf[sizeof(long long) * 3 + 1];
     snprintf(buf, sizeof buf, "%lld", value);
     return buf;

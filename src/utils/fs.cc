@@ -36,7 +36,6 @@
 #include <sys/types.h>
 #include <sys/file.h>
 
-namespace fs = lrun::fs;
 using std::string;
 
 const char fs::PATH_SEPARATOR = '/';
@@ -139,7 +138,7 @@ string fs::resolve(const string& path, const string& work_dir) {
                 link = result = buf;
                 break;
             }
-        };
+        }
     }
 
 cleanup:

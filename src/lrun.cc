@@ -20,10 +20,6 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "common.h"
-#include "cgroup.h"
-#include "fs.h"
-#include "strconv.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -41,270 +37,25 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <pthread.h>
+#include "utils/linux_only.h"
+#include "utils/for_each.h"
+#include "utils/log.h"
+#include "utils/fs.h"
+#include "utils/strconv.h"
+#include "utils/ensure.h"
+#include "options/options.h"
+#include "config.h"
+#include "cgroup.h"
 
 using namespace lrun;
 
 using std::string;
 using std::make_pair;
 
-static struct {
-    Cgroup::spawn_arg arg;
-    double cpu_time_limit;
-    double real_time_limit;
-    long long memory_limit;
-    long long output_limit;
-    bool enable_devices_whitelist;
-    bool enable_network;
-    bool enable_pidns;
-    bool pass_exitcode;
-    bool write_result_to_3;
-    useconds_t interval;
-    string cgname;
-    Cgroup* active_cgroup;
-
-    std::vector<gid_t> groups;
-    std::map<std::pair<Cgroup::subsys_id_t, std::string>, std::string> cgroup_options;
-} config;
+lrun::MainConfig config;
 
 static volatile sig_atomic_t signal_triggered = 0;
 static pthread_t fs_tracer_thread_id;
-
-static int get_terminal_width() {
-    struct winsize ts;
-    ioctl(0, TIOCGWINSZ, &ts);
-    return ts.ws_col;
-}
-
-static string line_wrap(const string& content, size_t width, int indent, const string& join = "") {
-    if (width <= 0) return content;
-
-    string result;
-    int line_size = 0;
-    for (size_t i = 0; i < content.length(); ++i) {
-        char c = content[i];
-        if (c == ' ') {
-            // should we break here?
-            bool should_break = true;
-            // look ahead for the next space char
-            for (size_t j = i + 1; j <= content.length(); ++j) {
-                char d = (j == content.length() ? ' ' : content[j]);
-                if (d == ' ' && j - i + join.length() + line_size < width) {
-                    should_break = false;
-                    break;
-                }
-            }
-            if (should_break) {
-                result += join + "\n";
-                for (int i = 0; i < indent; ++i) result += ' ';
-                line_size = indent;
-            } else {
-                result += c;
-                ++line_size;
-            }
-        } else {
-            // can not split from here
-            result += c;
-            if (c == '\n') line_size = 0; else ++line_size;
-        }
-    }
-    return result;
-}
-
-static void print_help(const string& submodule = "") {
-    int width = isatty(STDERR_FILENO) ? (get_terminal_width() - 1) : -1;
-    const int MIN_WIDTH = 60;
-    if (width < MIN_WIDTH && width >= 0) width = MIN_WIDTH;
-    string content;
-
-    if (submodule == "syscalls") {
-        content = line_wrap(
-            "--syscalls FILTER_STRING\n"
-            "  Default action for unlisted syscalls is to return EPERM.\n"
-            "\n"
-            "--syscalls !FILTER_STRING\n"
-            "  Default action for unlisted syscalls is to allow.\n"
-            "\n"
-            , width, 2);
-        content += line_wrap(
-            "Format:\n"
-            "  FILTER_STRING  := SYSCALL_RULE | FILTER_STRING + ',' + SYSCALL_RULE\n"
-            "  SYSCALL_RULE   := SYSCALL_NAME + EXTRA_ARG_RULE + EXTRA_ACTION\n"
-            "  EXTRA_ARG_RULE := '' | '[' + ARG_RULES + ']'\n"
-            "  ARG_RULES      := ARG_RULE | ARG_RULES + ',' + ARG_RULE\n"
-            "  ARG_RULE       := ARG_NAME + ARG_OP1 + NUMBER | ARG_NAME + ARG_OP2 + '=' + NUMBER\n"
-            "  ARG_NAME       := 'a' | 'b' | 'c' | 'd' | 'e' | 'f'\n"
-            "  ARG_OP1        := '==' | '=' | '!=' | '!' | '>' | '<' | '>=' | '<='\n"
-            "  ARG_OP2        := '&'\n"
-            "  EXTRA_ACTION   := '' | ':k' | ':e' | ':a'\n"
-            "\n"
-            , width, 20);
-        content += line_wrap(
-            "Notes:\n"
-            "  ARG_NAME:     `a` for the first arg, `b` for the second, ...\n"
-            "  ARG_OP1:      `=` is short for `==`, `!` is short for `!=`\n"
-            "  ARG_OP2:      `&`: bitwise and\n"
-            "  EXTRA_ACTION: `k` is to kill, `e` is to return EPERM, `a` is to allow\n"
-            "  SYSCALL_NAME: syscall name or syscall number, ex: `read`, `0`, ...\n"
-            "  NUMBER:       a decimal number containing only `0` to `9`\n"
-            "\n"
-            , width, 16);
-        content += line_wrap(
-            "Examples:\n"
-            "  --syscalls 'read,write,open,exit'\n"
-            "    Only read, write, open, exit are allowed\n"
-            "  --syscalls '!write[a=2]'\n"
-            "    Disallow write to fd 2 (stderr)\n"
-            "  --syscalls '!sethostname:k'\n"
-            "    Whoever calls sethostname will get killed\n"
-            "  --syscalls '!clone[a&268435456==268435456]'\n"
-            "    Do not allow a new user namespace to be created (CLONE_NEWUSER = 0x10000000)\n"
-            , width, 4);
-    } else {
-        content =
-            "Run program with resources limited.\n"
-            "\n"
-            "Usage: lrun [options] [--] command-args [3>stat]\n"
-            "\n";
-        string options =
-            "Options:\n"
-            "  --max-cpu-time    seconds     Limit cpu time. `seconds` can be a floating-point number\n"
-            "  --max-real-time   seconds     Limit physical time\n"
-            "  --max-memory      bytes       Limit memory (+swap) usage. `bytes` supports common suffix like `k`, `m`, `g`\n"
-            "  --max-output      bytes       Limit output. Note: lrun will make a \"best  effort\" to enforce the limit but it is NOT accurate\n"
-            "  --max-rtprio      n           Set max realtime priority\n"
-            "  --max-nfile       n           Set max number of file descriptors\n"
-            "  --max-stack       bytes       Set max stack size per process\n"
-            "  --max-nprocess    n           Set RLIMIT_NPROC. Note: user namespace is not separated, current processes are counted\n"
-            "  --isolate-process bool        Isolate PID, IPC namespace\n"
-            "  --basic-devices   bool        Enable device whitelist: null, zero, full, random, urandom\n"
-            "  --remount-dev     bool        Remount /dev and create only basic device files in it (see --basic-device)\n"
-            "  --reset-env       bool        Clean environment variables\n"
-            "  --network         bool        Whether network access is permitted\n"
-            "  --pass-exitcode   bool        Discard lrun exit code, pass child process's exit code\n"
-            "  --chroot          path        Chroot to specified `path` before exec\n"
-            "  --umount-outside  bool        Umount everything outside the chroot path. This is not necessary but can help to hide mount information. Note: umount is SLOW\n"
-            "  --chdir           path        Chdir to specified `path` after chroot\n"
-            "  --nice            value       Add nice with specified `value`. Only root can use a negative value\n"
-            "  --umask           int         Set umask\n"
-            "  --uid             uid         Set uid (`uid` must > 0). Only root can use this\n"
-            "  --gid             gid         Set gid (`gid` must > 0). Only root can use this\n"
-            "  --no-new-privs    bool        Do not allow getting higher privileges using exec. This disables things like sudo, ping, etc. Only root can set it to false. Require Linux >= 3.5\n"
-            "  --stdout-fd       int         Redirect child process stdout to specified fd\n"
-            "  --stderr-fd       int         Redirect child process stderr to specified fd\n";
-        if (seccomp::supported()) options +=
-            "  --syscalls        syscalls    Apply a syscall filter. "
-            " `syscalls` is basically a list of syscall names separated by ',' with an optional prefix '!'. If prefix '!' exists, it's a blacklist otherwise a whitelist."
-            " For full syntax of `syscalls`, see `--help-syscalls`. Conflicts with `--no-new-privs false`\n";
-        options +=
-            "  --cgname          string      Specify cgroup name to use. The specified cgroup will be created on demand, and will not be deleted. If this option is not set, lrun will pick"
-            " an unique cgroup name and destroy it upon exit.\n"
-            "  --hostname        string      Specify a new hostname\n"
-            "  --interval        seconds     Set interval status update interval\n"
-#ifndef NDEBUG
-            "  --debug                       Print debug messages\n"
-            "  --status                      Show realtime resource usage status\n"
-#endif
-            "  --help                        Show this help\n";
-        if (seccomp::supported()) options +=
-            "  --help-syscalls               Show full syntax of `syscalls`\n";
-        options +=
-            "  --version                     Show version information\n"
-            "\n"
-            "Options that could be used multiple times:\n"
-            "  --bindfs          dest src    Bind `src` to `dest`. This is performed before chroot. You should have read permission on `src`\n"
-            "  --bindfs-ro       dest src    Like `--bindfs` but also make `dest` read-only\n"
-            "  --tmpfs           path bytes  Mount writable tmpfs to specified `path` to hide filesystem subtree. `size` is in bytes. If it is 0, mount read-only."
-            " This is performed after chroot. You should have write permission on `path`\n"
-            "  --env             key value   Set environment variable before exec\n"
-            "  --cgroup-option   subsys k v  Apply cgroup setting before exec. Only root can use this\n"
-            "  --fd              n           Do not close fd `n`\n"
-            "  --cmd             cmd         Execute system command after tmpfs mounted. Only root can use this\n"
-            "  --group           gid         Set additional groups. Applied to lrun itself. Only root can use this\n"
-            "\n";
-        content += line_wrap(options, width, 32);
-        content += line_wrap(
-            "Return value:\n"
-            "  - If lrun is unable to execute specified command, non-zero is returned and nothing will be written to fd 3\n"
-            "  - Otherwise, lrun will return 0 and output time, memory usage, exit status of executed command to fd 3\n"
-            "  - If `--pass-exitcode` is set to true, lrun will just pass exit code of the child process\n"
-            "\n"
-            , width, 4);
-        content += line_wrap(
-            "Option processing order:\n"
-            "  --hostname, --fd, --umount-outside, (mount /proc), --bindfs, --bindfs-ro, --chroot, --tmpfs,"
-            " --remount-dev, --chdir, --cmd, --umask, --gid, --uid, (rlimit options), --env, --nice,"
-            " (cgroup limits), --syscalls\n"
-            "\n"
-            , width, 2);
-        content += line_wrap(
-            "Default options:\n"
-            "  lrun --network true --basic-devices false --isolate-process true"
-            " --remount-dev false --reset-env false --interval 0.02"
-            " --pass-exitcode false --no-new-privs true --umount-outside false"
-            " --max-nprocess 2048 --max-nfile 256"
-            " --max-rtprio 0 --nice 0\n"
-            , width, 7, " \\");
-    }
-
-    fprintf(stderr, "%s\n", content.c_str());
-    exit(0);
-}
-
-static void print_version() {
-    printf("lrun " VERSION "\n"
-           "Copyright (C) 2012-2014 Jun Wu <quark@zju.edu.cn>\n"
-           "\n"
-           "libseccomp support: %s\n"
-           "debug support: %s\n",
-           seccomp::supported() ? "yes" : "no",
-#ifdef NDEBUG
-           "no"
-#else
-           "yes"
-#endif
-           );
-    exit(0);
-}
-
-static void init_default_config() {
-    // default settings
-    config.cpu_time_limit = -1;
-    config.real_time_limit = -1;
-    config.memory_limit = -1;
-    config.output_limit = -1;
-    config.enable_devices_whitelist = false;
-    config.enable_network = true;
-    config.enable_pidns = true;
-    config.interval = (useconds_t)(0.02 * 1000000);
-    config.active_cgroup = NULL;
-    config.pass_exitcode = false;
-    config.write_result_to_3 = fs::is_accessible("/proc/self/fd/3", F_OK);
-
-    // arg settings
-    config.arg.nice = 0;
-    config.arg.uid = getuid();
-    config.arg.gid = getgid();
-    config.arg.umask = 022;
-    config.arg.chroot_path = "";
-    config.arg.chdir_path = "";
-    config.arg.remount_dev = 0;
-    config.arg.reset_env = 0;
-    config.arg.no_new_privs = true;
-    config.arg.umount_outside = false;
-    config.arg.clone_flags = 0;
-    config.arg.stdout_fd = STDOUT_FILENO;
-    config.arg.stderr_fd = STDERR_FILENO;
-    config.arg.fs_tracer = NULL;
-
-    // arg.rlimits settings
-    config.arg.rlimits[RLIMIT_NOFILE] = 256;
-    config.arg.rlimits[RLIMIT_NPROC] = 2048;
-    config.arg.rlimits[RLIMIT_RTPRIO] = 0;
-    config.arg.rlimits[RLIMIT_CORE] = 0;
-    config.arg.reset_env = 0;
-    config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
-    config.arg.syscall_list = "";
-}
 
 static int check_fd(int fd) {
     if (fs::is_accessible("/proc/self/fd/" + strconv::from_long(fd))) {
@@ -522,11 +273,11 @@ static void parse_cli_options(int argc, char * argv[]) {
             string cmd = NEXT_STRING_ARG;
             config.arg.cmd_list.push_back(cmd);
         } else if (option == "help") {
-            print_help();
+            options::help();
         } else if (option == "help-syscalls" && seccomp::supported()) {
-            print_help("syscalls");
+            options::help_syscalls();
         } else if (option == "version") {
-            print_version();
+            options::version();
 #ifndef NDEBUG
         } else if (option == "debug") {
             DEBUG_ENABLED = 1;
@@ -553,157 +304,6 @@ static void parse_cli_options(int argc, char * argv[]) {
 #undef NEXT_BOOL_ARG
 }
 
-static string access_mode_to_str(int mode) {
-    string result;
-    if (mode & R_OK) result += "r";
-    if (mode & W_OK) result += "w";
-    if (mode & X_OK) result += "x";
-    return result;
-}
-
-static void check_path_permission(const string& path, std::vector<string>& error_messages, int mode = R_OK) {
-    // path should be absolute and accessible
-    if (!fs::is_absolute(path)) {
-        error_messages.push_back(
-                string("Relative paths are forbidden for non-root users.\n")
-                + "Please change: " + path);
-        return;
-    }
-
-    if (fs::is_dir(path)) mode |= X_OK;
-    if (!fs::is_accessible(path, mode)) {
-        error_messages.push_back(
-                string("You do not have `") + access_mode_to_str(mode)
-                + "` permission on " + path);
-    }
-}
-
-static string follow_binds(const std::vector<std::pair<string, string> >& binds, const string& path) {
-    // only handle absolute paths
-    if (!fs::is_absolute(path)) return path;
-    string result = fs::expand(path);
-    for (int i = binds.size() - 1; i >= 0; --i) {
-        string prefix = binds[i].first + "/";
-        if (result.substr(0, prefix.length()) == prefix) {
-            // once is enough, because binds[i].second already followed previous binds
-            result = binds[i].second + result.substr(prefix.length() - 1);
-            break;
-        }
-    }
-    return result;
-}
-
-static void check_config() {
-    int is_root = (getuid() == 0);
-    std::vector<string> error_messages;
-
-    if (config.arg.uid == 0) {
-        error_messages.push_back(
-                "For security reason, running commands with uid = 0 is not allowed.\n"
-                "Please specify a user ID using `--uid`.");
-    } else if (!is_root && config.arg.uid != getuid()) {
-        error_messages.push_back(
-                "For security reason, setting uid to other user requires root.");
-    }
-
-    if (config.arg.gid == 0) {
-        error_messages.push_back(
-                "For security reason, running commands with gid = 0 is not allowed.\n"
-                "Please specify a group ID using `--gid`.");
-    } else if (!is_root && config.arg.gid != getgid()) {
-        error_messages.push_back(
-                "For security reason, setting gid to other group requires root.");
-    }
-
-    if (config.arg.argc <= 0) {
-        error_messages.push_back(
-                "command_args cannot be empty. "
-                "Use `--help` to see full options.");
-    }
-
-    if (!is_root) {
-        if (config.arg.cmd_list.size() > 0) {
-            error_messages.push_back(
-                    "For security reason, `--cmd` requires root.");
-        }
-
-        if (config.groups.size() > 0) {
-            error_messages.push_back(
-                    "For security reason, `--group` requires root.");
-        }
-
-        // check paths, require absolute paths and read permissions
-        // check --bindfs
-        std::vector<std::pair<string, string> > binds;
-        FOR_EACH(p, config.arg.bindfs_list) {
-            const string& dest = p.first;
-            const string& src = p.second;
-            check_path_permission(follow_binds(binds, src), error_messages);
-            binds.push_back(make_pair(fs::expand(dest), follow_binds(binds, fs::expand(src))));
-        }
-
-        // check --chroot
-        string chroot_path = config.arg.chroot_path;
-        if (!chroot_path.empty()) {
-            check_path_permission(follow_binds(binds, chroot_path), error_messages);
-        }
-
-        // check --chdir
-        if (!config.arg.chdir_path.empty()) {
-            string chdir_path = fs::join(chroot_path, config.arg.chdir_path);
-            check_path_permission(follow_binds(binds, chdir_path), error_messages);
-        }
-
-        // restrict --remount-ro, only allows dest in --bindfs
-        // because something like `--remount-ro /` affects outside world
-        FOR_EACH(p, config.arg.remount_list) {
-            const string& dest = p.first;
-            if (!config.arg.bindfs_dest_set.count(dest)) {
-                error_messages.push_back(
-                        "For security reason, `--remount-ro A` is only allowed "
-                        "if there is a `--bindfs A B`.");
-            }
-        }
-
-        if (config.arg.no_new_privs == false) {
-            error_messages.push_back(
-                    "For security remount, `--no-new-privs false` is forbidden "
-                    "for non-root users.");
-        }
-
-        if (config.arg.nice < 0) {
-            error_messages.push_back(
-                    "Non-root users cannot set a negative value of `--nice`");
-        }
-
-        if (!config.cgroup_options.empty()) {
-            error_messages.push_back(
-                    "Non-root users cannot use `--cgroup-option`");
-        }
-
-        FOR_EACH(p, config.cgroup_options) {
-            const string& key = p.first.second;
-            if (key.find("..") != string::npos || key.find("/") != string::npos) {
-                error_messages.push_back(
-                        "Invalid cgroup option key: `" + key + "`");
-            }
-        }
-    }
-
-    if (config.arg.syscall_list.empty() && config.arg.syscall_action == seccomp::action_t::DEFAULT_EPERM) {
-        error_messages.push_back(
-                "Syscall filter forbids all syscalls, which is not allowed.");
-    }
-
-    if (error_messages.size() > 0) {
-        FOR_EACH(message, error_messages) {
-            fprintf(stderr, "%s\n\n", message.c_str());
-        }
-        fprintf(stderr, "Please fix above issues and try again.\n");
-        exit(1);
-    }
-}
-
 static void check_environment() {
     // require root
     if (geteuid() != 0 || setuid(0)) {
@@ -717,15 +317,6 @@ static void check_environment() {
     e = setgroups(config.groups.size(), &config.groups[0]);
     if (e) ERROR("setgroups failed");
 }
-
-#ifndef NOW
-#include <sys/time.h>
-static double now() {
-    struct timeval t;
-    gettimeofday(&t, 0);
-    return t.tv_usec / 1e6 + t.tv_sec;
-}
-#endif
 
 static void clean_cg_exit(Cgroup& cg, int exit_code) {
     INFO("cleaning and exiting with code = %d", exit_code);
@@ -848,7 +439,7 @@ static void create_fs_tracer() {
     ensure_zero(pthread_attr_destroy(&attr));
 }
 
-static void setup_cgroup() {
+static void configure_cgroup() {
     Cgroup& cg = *config.active_cgroup;
 
     // assume cg is created just now and nobody has used it before.
@@ -1081,13 +672,12 @@ static int run_command() {
 }
 
 int main(int argc, char * argv[]) {
-    if (argc <= 1) print_help();
+    if (argc <= 1) lrun::options::help();
 
-    init_default_config();
     parse_cli_options(argc, argv);
 
-    check_config();
-    check_environment();
+    config.check();
+    check_environment();  // we becomes root after this line
 
     INFO("lrun %s pid = %d", VERSION, (int)getpid());
 
@@ -1098,7 +688,7 @@ int main(int argc, char * argv[]) {
         Cgroup& cg = *config.active_cgroup;
         // lock the cgroup so other lrun process with same cgname will wait
         fs::ScopedFileLock cg_lock(cg.subsys_path().c_str());
-        setup_cgroup();
+        configure_cgroup();
         int ret = run_command();
         clean_cg_exit(cg, ret);
     }

@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "common.h"
+#include "utils/log.h"
 
 #include <cinttypes>
 

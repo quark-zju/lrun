@@ -6,7 +6,7 @@
 
 # no binaries
 test/[a-z_]*
-src/[a-z_]*
+src/lrun
 *.so
 
 # include sources

@@ -20,9 +20,6 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "cgroup.h"
-#include "fs.h"
-#include "strconv.h"
 #include <cstdio>
 #include <cstring>
 #include <list>
@@ -38,6 +35,11 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include "cgroup.h"
+#include "utils/linux_only.h"
+#include "utils/for_each.h"
+#include "utils/fs.h"
+#include "utils/strconv.h"
 
 
 using namespace lrun;
