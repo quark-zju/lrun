@@ -254,7 +254,12 @@ static void parse_cli_options(int argc, char * argv[]) {
             string value = NEXT_STRING_ARG;
             int subsys_id = Cgroup::subsys_id_from_name(subsys_name.c_str());
             if (subsys_id >= 0) {
-                config.cgroup_options[make_pair((Cgroup::subsys_id_t)subsys_id, key)] = value;
+                if (key.find("..") != string::npos || key.find('/') != string::npos) {
+                    WARNING("unsafe cgroup option '%s' = '%s' ignored",
+                            key.c_str(), value.c_str());
+                } else {
+                    config.cgroup_options[make_pair((Cgroup::subsys_id_t)subsys_id, key)] = value;
+                }
             } else {
                 WARNING("cgroup option '%s' = '%s' ignored: "
                         "subsystem '%s' not found",
