@@ -56,7 +56,6 @@ using std::make_pair;
 lrun::MainConfig config;
 
 static volatile sig_atomic_t signal_triggered = 0;
-static pthread_t fs_tracer_thread_id;
 
 static void become_root() {
     // require root
@@ -78,12 +77,7 @@ static void clean_cg_exit(Cgroup& cg, int exit_code) {
     if (config.arg.fs_tracer) {
         // pre-kill
         cg.killall(false /* confirm */);
-        if (fs_tracer_thread_id) {
-            pthread_cancel(fs_tracer_thread_id);
-            fs_tracer_thread_id = 0;
-        }
-        delete config.arg.fs_tracer;
-        config.arg.fs_tracer = NULL;
+        options::fstracer::stop();
     }
 
     if (config.cgname.empty()) {
@@ -159,38 +153,6 @@ static void create_cgroup() {
 
     if (!new_cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
     config.active_cgroup = &new_cg;
-}
-
-static int fs_trace_callback(const char path[], int fd, pid_t pid, uint64_t mask) {
-    INFO("trace %s", path);
-    return 0;
-}
-
-static void * fs_tracer_thread(void *data) {
-    fs::Tracer *tracer = (fs::Tracer*) data;
-    if (!tracer) return 0;
-    pthread_setname_np(pthread_self(), "lrun:fstracer");
-    while (1) {
-        tracer->process_events();
-    }
-    return NULL;
-}
-
-static void create_fs_tracer() {
-    config.arg.fs_tracer = new fs::Tracer();
-    if (config.arg.fs_tracer->init(
-                FAN_CLASS_PRE_CONTENT | FAN_CLOEXEC | FAN_UNLIMITED_QUEUE,
-                O_RDWR | O_CLOEXEC,
-                &fs_trace_callback)) {
-        FATAL("can not init filesystem tracer");
-    }
-    INFO("starting fs tracer thread");
-    pthread_attr_t attr;
-    ensure_zero(pthread_attr_init(&attr));
-    // the thread must be joinable so that we can reliably use pthread_kill to detect if it is alive
-    ensure_zero(pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE));
-    pthread_create(&fs_tracer_thread_id, NULL, &fs_tracer_thread, (void*) config.arg.fs_tracer);
-    ensure_zero(pthread_attr_destroy(&attr));
 }
 
 static void configure_cgroup() {
@@ -295,7 +257,7 @@ static int run_command() {
         }
 
         // check fs tracer thread
-        if (fs_tracer_thread_id && pthread_kill(fs_tracer_thread_id, 0) != 0) {
+        if (options::fstracer::dead()) {
             fprintf(stderr, "Filesystem tracer thread was killed, exiting...\n");
             fflush(stderr);
             clean_cg_exit(cg, 5);
@@ -435,7 +397,9 @@ int main(int argc, char * argv[]) {
     INFO("lrun %s pid = %d", VERSION, (int)getpid());
 
     create_cgroup();
-    create_fs_tracer();
+    // TODO move this somewhere, probably configure_cgroup ?
+    options::fstracer::start();
+    config.arg.fs_tracer = options::fstracer::get_tracer();
 
     {
         Cgroup& cg = *config.active_cgroup;

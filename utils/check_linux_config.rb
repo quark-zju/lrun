@@ -52,10 +52,14 @@ check_config '    network',   'CONFIG_NET_NS'
 check_config 'Cgroup',        'CONFIG_CGROUPS'
 check_config '    device',    'CONFIG_CGROUP_DEVICE'
 check_config '    cpuacct',   'CONFIG_CGROUP_CPUACCT'
+
 # Since 2.6.39-bpo60-2 for Squeeze the memory cgroup support is built in
 if check_kernel [0]..[2, 6, 39]
   check_config '    memory',    'CONFIG_CGROUP_MEM_RES_CTLR'
 end
 check_config '    freezer',   'CONFIG_CGROUP_FREEZER'
+
+check_config 'fanotify',      'CONFIG_FANOTIFY'
+check_config '    check', 'CONFIG_FANOTIFY_ACCESS_PERMISSIONS'
 
 exit(@no_problem ? 0 : 1)
