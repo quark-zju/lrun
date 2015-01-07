@@ -21,9 +21,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "test.h"
-#include "strconv.h"
+#include "utils/strconv.h"
 
-using namespace lrun::strconv;
+using namespace strconv;
 
 static long long m = 9223372036854775807LL;
 

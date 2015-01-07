@@ -21,12 +21,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "test.h"
-#include "fs.h"
+#include "utils/fs.h"
 #include <cstdlib>
 #include <errno.h>
 #include <unistd.h>
-
-using namespace lrun;
 
 #define TMP "/tmp"
 
@@ -65,18 +63,14 @@ TESTCASE(resolve) {
     system("ln -s " TMP "/_rnone " TMP "/_rn");
     system("rm -f " TMP "/_rnone");
     CHECK(fs::resolve(TMP) == TMP);
-    CHECK(fs::resolve("./_r1", TMP) == TMP "/_r1");
-    CHECK(fs::resolve("_r2", TMP) == TMP "/_r1");
-    CHECK(fs::resolve("./_r3", TMP) == TMP "/_r1");
-    CHECK(fs::resolve("./_rn", TMP) == TMP "/_rnone");
-    CHECK(fs::resolve(".." TMP "/./_r1", TMP) == TMP "/_r1");
-    CHECK(fs::resolve(".." TMP "/./_r2", TMP) == TMP "/_r1");
-    CHECK(fs::resolve(".." TMP "/./_r3", TMP) == TMP "/_r1");
-    CHECK(fs::resolve(".." TMP "/./_rn", TMP) == TMP "/_rnone");
-    CHECK(fs::resolve(TMP "/./_r1", TMP) == TMP "/_r1");
-    CHECK(fs::resolve(TMP "/./_r2", TMP) == TMP "/_r1");
-    CHECK(fs::resolve(TMP "/./_r3", TMP) == TMP "/_r1");
-    CHECK(fs::resolve(TMP "/./_rn", TMP) == TMP "/_rnone");
+    CHECK(fs::resolve(TMP "/./_r1") == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/././_r2") == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/./_r3") == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/./_rn") == "");  // cannot resolve because _rnone is deleted
+    CHECK(fs::resolve(TMP "/.." TMP "/./_r1") == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/.." TMP "/./_r2") == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/.." TMP "/./_r3") == TMP "/_r1");
+    CHECK(fs::resolve(TMP "/.." TMP "/./_rn") == "");
     system("rm -f " TMP "/_r1 " TMP "/_r2 " TMP "/_r3 " TMP "/_rn");
 }
 

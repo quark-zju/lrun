@@ -107,13 +107,10 @@ namespace fs {
     /**
      * Follow symbolic links, recursively
      * @param  path         path to resolve
-     * @return path         resolved path, or:
-     *                        - expand(join(work_dir, path))
-     *                          if path cannot be resolved and path is not absolute
-     *                        - expand(path)
-     *                          if path is absolute
+     * @return path         resolved path
+     *         ""           error happened. ex. symlink to non-exist path
      */
-    std::string resolve(const std::string& path, const std::string& work_dir = "");
+    std::string resolve(const std::string& path);
 
     /**
      * Test access to a specified file

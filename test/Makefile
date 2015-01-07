@@ -7,13 +7,13 @@ LD=g++
 
 all: $(BINARIES)
 
-fs_unit_test:  test.o ../src/fs.o ../src/common.o fs_unit_test.o
+fs_unit_test:  test.o ../src/utils/fs.o fs_unit_test.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
-cgroup_unit_test: test.o ../src/cgroup.o ../src/strconv.o ../src/fs.o ../src/common.o ../src/seccomp.o cgroup_unit_test.o
-	$(LD) $(LDFLAGS) $^ $(LD_SECCOMP_FLAGS) -o $@
+cgroup_unit_test: test.o ../src/cgroup.o ../src/utils/strconv.o ../src/utils/fs.o ../src/utils/now.o ../src/utils/log.o ../src/seccomp.o cgroup_unit_test.o
+	$(LD) -pthread $(LDFLAGS) $^ $(LD_SECCOMP_FLAGS) -o $@
 
-strconv_unit_test: test.o ../src/strconv.o ../src/common.o strconv_unit_test.o
+strconv_unit_test: test.o ../src/utils/strconv.o strconv_unit_test.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
 integration_test: test.o integration_test.o

@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <climits>
 #include <dirent.h>
 #include <fcntl.h>
 #include <list>
@@ -110,48 +111,21 @@ string fs::expand(const string& path) {
     return result;
 }
 
-string fs::resolve(const string& path, const string& work_dir) {
-    string result = expand(is_absolute(path) ? path : join(work_dir, path));
-    int dirfd = AT_FDCWD;
-    size_t buf_size = PATH_MAX;
-    char *buf = (char*) malloc(buf_size + 1);
-
-    if (!buf) goto cleanup;
-
-    if (!work_dir.empty() && !is_absolute(path)) {
-        dirfd = open(work_dir.c_str(), O_RDONLY);
-        if (dirfd == -1) goto cleanup;
-    }
-
-    for (string link = path;;) { // recursively readlink
-        for (;;) {
-            // readlink requires unknown space, try until we got full path
-            ssize_t out_size = readlinkat(dirfd, link.c_str(), buf, buf_size);
-            if (out_size < 0) {
-                goto cleanup;
-            } else if ((size_t) out_size >= buf_size) {
-                // try bigger
-                char *new_buf = (char*) realloc(buf, buf_size + PATH_MAX + 1);
-                if (new_buf) {
-                    buf = new_buf;
-                    buf_size += PATH_MAX;
-                } else {
-                    // give up
-                    result = buf;
-                    break;
-                }
-            } else {
-                buf[out_size] = 0;
-                link = result = buf;
-                break;
-            }
+string fs::resolve(const string& path) {
+    string result = is_absolute(path) ? expand(path) : path;
+    char * buf = NULL;
+    while (1) {
+        buf = realpath(result.c_str(), NULL);
+        if (buf) {
+            string next = buf;
+            free(buf);
+            buf = NULL;
+            if (next == result) return result;
+            result = next;
+        } else {
+            return "";
         }
     }
-
-cleanup:
-    if (dirfd != -1 && dirfd != AT_FDCWD) close(dirfd);
-    if (buf) free(buf);
-    return result;
 }
 
 bool fs::is_accessible(const string& path, int mode, const string& work_dir) {
