@@ -68,6 +68,13 @@ bool fs::is_absolute(const string& path) {
     return path.length() > 0 && path.data()[0] == PATH_SEPARATOR;
 }
 
+bool fs::is_fd_valid(int fd) {
+    char buf[sizeof(int) * 3 + 2];
+    snprintf(buf, sizeof(buf), "%d", fd);
+    buf[sizeof(buf) - 1] = 0;
+    return fs::is_accessible("/proc/self/fd/" + string(buf));
+}
+
 string fs::expand(const string& path) {
     std::list<string> paths;
     size_t pos = string::npos, start = 0;
@@ -298,7 +305,7 @@ std::map<string, fs::MountEntry> fs::get_mounts() {
     return result;
 }
 
-std::string get_mount_point(const std::string& path) {
+std::string fs::get_mount_point(const std::string& path) {
   string result = "/";
   static std::map<string, fs::MountEntry> mounts;
   if (mounts.empty()) mounts = fs::get_mounts();

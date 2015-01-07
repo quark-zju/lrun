@@ -388,6 +388,12 @@ int Cgroup::reset_usages() {
     return e ? -1 : 0;
 }
 
+int Cgroup::reset_cpu_usage() {
+    int e = 0;
+    e = set(CG_CPUACCT, "cpuacct.usage", "0");
+    return e ? -1 : 0;
+}
+
 double Cgroup::cpu_usage() const {
     string cpu_usage = get(CG_CPUACCT, "cpuacct.usage", 31);
     // convert from nanoseconds to seconds
@@ -903,6 +909,8 @@ static int clone_init_fn(void *) {
         FOR_EACH(fd, fds) close(fd);
     }
 
+    pthread_setname_np(pthread_self(), "lrun:pidnsinit");
+
     while (1) pause();
     return 0;
 }
@@ -956,6 +964,9 @@ static int clone_main_fn(void * clone_arg) {
     // not closing sockets[0] here, it will closed on exec
     // if exec fails, it will be closed upon process exit (aka. this function returns)
     fd_set_cloexec(arg.sockets[0]);
+
+    // it's time for callback
+    if (arg.callback_child) arg.callback_child((void *) &arg);
 
     // exec target. syscall filter must be done just before execve because we need other
     // syscalls in above code.
@@ -1139,7 +1150,10 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     INFO("attach %lu", (unsigned long)child_pid);
     attach(child_pid);
 
-    // child is blocking, waiting us before exec, let it go
+    // child is blocking, waiting us before exec
+    // it's time to call callback and let the child go
+    if (arg.callback_parent) arg.callback_parent((void *) &arg);
+
     strncpy(buf, "RUN", sizeof buf);
     close(arg.sockets[0]);
     ret = send(arg.sockets[1], buf, sizeof buf, MSG_NOSIGNAL);

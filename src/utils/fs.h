@@ -90,6 +90,14 @@ namespace fs {
     bool is_absolute(const std::string& path);
 
     /**
+     * Test if a fd is valid
+     * @param  fd           fd to test
+     * @return 1            valid
+     *         0            invalid
+     */
+    bool is_fd_valid(int fd);
+
+    /**
      * Expand a path. Do not follow symbol links.
      * @param  path         path to expand
      * @return path         expanded path

@@ -1,12 +1,13 @@
 #include <string>
 #include "../utils/strconv.h"
+#include "../utils/fs.h"
 #include "options.h"
 
 using std::string;
 
 
 static int check_fd(int fd) {
-    if (fs::is_accessible("/proc/self/fd/" + strconv::from_long(fd))) {
+    if (fs::is_fd_valid(fd)) {
         return fd;
     } else {
         FATAL("fd %d is not accessible", fd)
@@ -140,6 +141,11 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
                 default:
                     config.arg.syscall_list = syscalls;
             }
+        } else if (option == "fopen-filter") {
+            REQUIRE_NARGV(2);
+            string condition = NEXT_STRING_ARG;
+            string action = NEXT_STRING_ARG;
+            options::fopen_filter(condition, action);
         } else if (option == "group") {
             REQUIRE_NARGV(1);
             gid_t gid = (gid_t)NEXT_LONG_LONG_ARG;
@@ -229,6 +235,8 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
             options::help();
         } else if (option == "help-syscalls" && seccomp::supported()) {
             options::help_syscalls();
+        } else if (option == "help-fopen-filter") {
+            options::help_fopen_filter();
         } else if (option == "version") {
             options::version();
 #ifndef NDEBUG

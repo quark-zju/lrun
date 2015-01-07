@@ -101,13 +101,14 @@ static string help_content(int width) {
     if (seccomp::supported()) options +=
         "  --help-syscalls               Show full syntax of `syscalls`\n";
     options +=
+        "  --help-fopen-filter           Show detailed help about fopen filter\n"
         "  --version                     Show version information\n"
         "\n"
         "Options that could be used multiple times:\n"
         "  --bindfs          dest src    Bind `src` to `dest`. This is performed before chroot. You should have read permission on `src`\n"
         "  --bindfs-ro       dest src    Like `--bindfs` but also make `dest` read-only\n"
         "  --tmpfs           path bytes  Mount writable tmpfs to specified `path` to hide filesystem subtree. `size` is in bytes. If it is 0, mount read-only."
-        "  --fopen-filter    ...         Do something when a file is opened. For details, see `--help-fopen-filter`.\n"
+        "  --fopen-filter    cond action Do something when a file is opened. For details, see `--help-fopen-filter`\n"
         " This is performed after chroot. You should have write permission on `path`\n"
         "  --env             key value   Set environment variable before exec\n"
         "  --cgroup-option   subsys k v  Apply cgroup setting before exec. Only root can use this\n"
@@ -188,6 +189,51 @@ static string help_syscalls_content(int width) {
     return content;
 }
 
+static string help_fopen_filter_content(int width) {
+    string content;
+    content += line_wrap(
+        "--fopen-filter CONDITION ACTION\n"
+        "  Trigger an action when a file open condition is met\n"
+        "\n"
+        , width, 2);
+    content += line_wrap(
+        "Format:\n"
+        "  CONDITION             := CONDITION_MOUNTPOINT | CONDITION_FILE\n"
+        "  CONDITION_MOUNTPOINT  := 'm:' + PATH + ':' + REGEXP\n"
+        "  CONDITION_FILE        := 'f:' + PATH\n"
+        "  ACTION                := ACTION_ACCEPT | ACTION_REJECT | ACTION_RESET_TIMER\n"
+        "  ACTION_ACCEPT         := 'a'\n"
+        "  ACTION_DENY           := 'd'\n"
+        "  ACTION_RESET_USAGE    := 'r' | 'R'\n"
+        "  ACTION_LOG            := 'l' | 'l:' + LOG_FD\n"
+        "\n"
+        , width, 27);
+    content += line_wrap(
+        "Notes:\n"
+        "  - PATH will be prepended with chroot path\n"
+        "  - PATH and REGEXP in CONDITION_MOUNTPOINT should be escaped using '\\'. For example, replace ':' with '\\:'.\n"
+        "  - ACTION_RESET_USAGE means reset CPU time counter. If 'R' is used, it is only effective for the 1st time, otherwise multiple times\n"
+        "  - CONDITION_FILE does not work in /proc. Use CONDITION_MOUNTPOINT instead\n"
+        "  - ACTION_LOG will log full paths, one per line, to stderr\n"
+        "  - Mount point can be any sub path inside a real mount point. For example, /home/foo will be parsed as /home if /home/foo is not a mount point but /home is.\n"
+        "  - If multiple conditions are met, the first one takes effect\n"
+        "  - Filters have performance impact on all (including ones outside lrun) processes\n"
+        "\n"
+        , width, 4);
+    content += line_wrap(
+        "Examples:\n"
+        "  --fopen-filter f:/usr/bin/cat R\n"
+        "    If /usr/bin/cat is opened for the first time, lrun CPU time counter will be reset to zero.\n"
+        "  --fopen-filter 'm:/etc:(\\.conf$|passwd|shadow)' l:5 5>/tmp/faccess.log\n"
+        "    Log access to sensitive config files to /tmp/faccess.log\n"
+        "  --fopen-filter 'm:/bin:/zsh$' d\n"
+        "    Deny access to files with basename zsh. Effective on mountpoint /bin or / (if /bin is not a mountpoint but / is)\n"
+        "  --fopen-filter 'm:/proc:/status$' a --fopen-filter 'm:/proc:/sta[^/]*$' d\n"
+        "    Deny access to /proc/**/sta*, but allow /proc/**/status\n"
+        , width, 4);
+    return content;
+}
+
 string version_content(int) {
     string content;
     content = "lrun " VERSION "\n"
@@ -227,6 +273,10 @@ void lrun::options::help() {
 
 void lrun::options::help_syscalls() {
     print_help(help_syscalls_content);
+}
+
+void lrun::options::help_fopen_filter() {
+    print_help(help_fopen_filter_content);
 }
 
 void lrun::options::version() {

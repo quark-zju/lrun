@@ -27,8 +27,6 @@
 #include <set>
 #include <list>
 #include <sys/resource.h>
-#include "utils/fs.h"
-#include "utils/fs_tracer.h"
 #include "seccomp.h"
 
 // Old system does not have RLIMIT_RTTIME, define it as invalid
@@ -37,6 +35,9 @@
 #endif
 
 namespace lrun {
+    class Cgroup;
+    typedef void cgroup_callback_func(void *);
+
     class Cgroup {
         public:
 
@@ -247,6 +248,13 @@ namespace lrun {
             int reset_usages();
 
             /**
+             * restart cpuacct usage
+             * @return  0           success
+             *         <0           failed
+             */
+            int reset_cpu_usage();
+
+            /**
              * limit devices to null, zero, full, random and urandom
              *
              * @return  0           success
@@ -273,7 +281,6 @@ namespace lrun {
                 std::string syscall_list;   // syscall whitelist or blacklist
                 int stdout_fd;              // redirect stdout to
                 int stderr_fd;              // redirect stderr to
-                fs::Tracer *fs_tracer;      // fanotify_fd
                 struct {                    // set uts namespace strings
                     std::string sysname;
                     std::string nodename;
@@ -300,6 +307,12 @@ namespace lrun {
                 int remount_dev;            // Recreate a minimal dev
                 std::list<std::pair<std::string, std::string> > env_list;
                                             // environment variables whitelist
+                cgroup_callback_func * callback_parent;
+                                            // callback function, just before seccomp and execve
+                                            // run in the context of parent process
+                cgroup_callback_func * callback_child;
+                                            // like callback_parent but run in the context of
+                                            // child process
             };
 
             /**

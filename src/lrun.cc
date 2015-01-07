@@ -74,7 +74,7 @@ static void become_root() {
 static void clean_cg_exit(Cgroup& cg, int exit_code) {
     INFO("cleaning and exiting with code = %d", exit_code);
 
-    if (config.arg.fs_tracer) {
+    if (options::fstracer::started()) {
         // pre-kill
         cg.killall(false /* confirm */);
         options::fstracer::stop();
@@ -155,6 +155,23 @@ static void create_cgroup() {
     config.active_cgroup = &new_cg;
 }
 
+static void cgroup_callback_parent(void * /* args */) {
+    Cgroup& cg = *config.active_cgroup;
+
+    // reset cpu usage, it is not really necessary but makes cpu time accounting
+    // slightly more accurate.
+    int ret;
+    ret = cg.reset_cpu_usage();
+    (void)ret;
+
+}
+
+static void cgroup_callback_child(void * /* args */) {
+    // apply fs tracer (fanotify) settings
+    // this must be done in child context because it has different fs context
+    lrun::options::fstracer::apply_settings();
+}
+
 static void configure_cgroup() {
     Cgroup& cg = *config.active_cgroup;
 
@@ -204,6 +221,10 @@ static void configure_cgroup() {
     if (config.cpu_time_limit > 0) {
         config.arg.rlimits[RLIMIT_CPU] = (int)(ceil(config.cpu_time_limit));
     }
+
+    // setup callback
+    config.arg.callback_parent = &cgroup_callback_parent;
+    config.arg.callback_child = &cgroup_callback_child;
 }
 
 static int run_command() {
@@ -217,6 +238,9 @@ static int run_command() {
             clean_cg_exit(cg, 5);
         }
     }
+
+    // start fs tracing thread
+    lrun::options::fstracer::start(cg, config.arg.chroot_path);
 
     // spawn child
     pid_t pid = 0;
@@ -257,7 +281,7 @@ static int run_command() {
         }
 
         // check fs tracer thread
-        if (options::fstracer::dead()) {
+        if (options::fstracer::started() && !options::fstracer::alive()) {
             fprintf(stderr, "Filesystem tracer thread was killed, exiting...\n");
             fflush(stderr);
             clean_cg_exit(cg, 5);
@@ -397,9 +421,6 @@ int main(int argc, char * argv[]) {
     INFO("lrun %s pid = %d", VERSION, (int)getpid());
 
     create_cgroup();
-    // TODO move this somewhere, probably configure_cgroup ?
-    options::fstracer::start();
-    config.arg.fs_tracer = options::fstracer::get_tracer();
 
     {
         Cgroup& cg = *config.active_cgroup;
