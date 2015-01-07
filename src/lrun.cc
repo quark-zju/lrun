@@ -43,7 +43,7 @@
 #include "utils/fs.h"
 #include "utils/strconv.h"
 #include "utils/ensure.h"
-#include "utils/version.h"
+#include "version.h"
 #include "options/options.h"
 #include "config.h"
 #include "cgroup.h"

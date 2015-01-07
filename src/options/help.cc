@@ -25,7 +25,7 @@
 #include <string>
 #include "options.h"
 #include "../seccomp.h"
-#include "../utils/version.h"
+#include "../version.h"
 
 
 using std::string;
