@@ -28,6 +28,7 @@
 #include <cstring>
 #include <climits>
 #include <dirent.h>
+#include <glob.h>
 #include <fcntl.h>
 #include <list>
 #include <mntent.h>
@@ -65,15 +66,63 @@ string fs::join(const string& dirname, const string& basename) {
   }
 }
 
+string fs::dirname(const string& path) {
+  size_t pos = path.find_last_of(PATH_SEPARATOR);
+  if (pos == string::npos) {
+    return "";
+  } else {
+    return path.substr(0, pos);
+  }
+}
+
+string fs::basename(const string& path) {
+  size_t pos = path.find_last_of(PATH_SEPARATOR);
+  if (pos == string::npos) {
+    return path;
+  } else {
+    return path.substr(pos + 1);
+  }
+}
+
+string fs::extname(const string& path) {
+  string name = fs::basename(path);
+  size_t pos = name.find_last_of('.');
+  if (pos == string::npos) {
+    return "";
+  } else {
+    return name.substr(pos);
+  }
+}
+
 bool fs::is_absolute(const string& path) {
     return path.length() > 0 && path.data()[0] == PATH_SEPARATOR;
+}
+
+bool fs::is_regular_file(const string& path) {
+  struct stat buf;
+  if (lstat(path.c_str(), &buf) == -1) return 0;
+  return S_ISREG(buf.st_mode) ? 1 : 0;
+}
+
+bool fs::is_symlink(const string& path) {
+  struct stat buf;
+  if (lstat(path.c_str(), &buf) == -1) return 0;
+  return S_ISLNK(buf.st_mode) ? 1 : 0;
+}
+
+bool fs::is_disconnected(const string& path) {
+  struct stat buf;
+  if (stat(path.c_str(), &buf) == -1) {
+    return errno == ENOTCONN;
+  }
+  return false;
 }
 
 bool fs::is_fd_valid(int fd) {
     char buf[sizeof(int) * 3 + 2];
     snprintf(buf, sizeof(buf), "%d", fd);
     buf[sizeof(buf) - 1] = 0;
-    return fs::is_accessible("/proc/self/fd/" + string(buf));
+    return fs::is_accessible("/proc/self/fd/" + string(buf), F_OK);
 }
 
 string fs::expand(const string& path) {
@@ -168,10 +217,10 @@ string fs::read(const string& path, size_t max_length) {
     return buffer;
 }
 
-int fs::is_dir(const string& path) {
+bool fs::is_dir(const string& path) {
     struct stat buf;
     if (stat(path.c_str(), &buf) == -1) return 0;
-    return S_ISDIR(buf.st_mode) ? 1 : 0;
+    return S_ISDIR(buf.st_mode);
 }
 
 int fs::mkdir_p(const string& dir, const mode_t mode) {
@@ -218,6 +267,38 @@ int fs::rm_rf(const string& path) {
 
     // otherwise something must went wrong
     return -1;
+}
+
+std::list<string> fs::list(const string& path) {
+  std::list<string> result;
+
+  struct dirent **namelist = 0;
+  int nlist = ::scandir(path.c_str(), &namelist, 0, alphasort);
+  for (int i = 0; i < nlist; ++i) {
+    const char * name = namelist[i]->d_name;
+    // skip . and ..
+    if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
+      result.push_back(name);
+    }
+    free(namelist[i]);
+  }
+  if (namelist) free(namelist);
+
+  return result;
+}
+
+std::list<string> fs::glob(const string& pattern) {
+  std::list<string> result;
+  glob_t globbuf;
+
+  globbuf.gl_offs = 0;
+  glob(pattern.c_str(), GLOB_DOOFFS | GLOB_NOSORT | GLOB_BRACE, NULL, &globbuf);
+  for (size_t i = 0; ; ++i) {
+      if (!globbuf.gl_pathv[i]) break;
+      result.push_back(globbuf.gl_pathv[i]);
+  }
+
+  return result;
 }
 
 int fs::chmod(const std::string& path, const mode_t mode) {

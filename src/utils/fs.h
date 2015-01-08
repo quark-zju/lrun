@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <string>
 #include <map>
+#include <list>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <unistd.h>
@@ -58,7 +59,7 @@ namespace fs {
 
     /**
      * Path to file containing mounts information
-     * Typically, it is "/proc/mounts"
+     * Typically, it is "/proc/mounts" ("/etc/mtab")
      */
     extern const char * const MOUNTS_PATH;
     extern const char * const PROC_PATH;
@@ -81,21 +82,26 @@ namespace fs {
      */
     std::string join(const std::string& dirname, const std::string& basename);
 
-    /**
-     * Test if a path is absolute
-     * @param  path         path to test
-     * @return 1            it's absolute
-     *         0            it's relative
-     */
+    std::string dirname(const std::string& path);
+    std::string basename(const std::string& path);
+    std::string extname(const std::string& path);
+
     bool is_absolute(const std::string& path);
+    bool is_disconnected(const std::string& path);
+    bool is_dir(const std::string& path);
+    bool is_regular_file(const std::string& path);
+    bool is_symlink(const std::string& path);
+    bool is_fd_valid(int fd);
 
     /**
-     * Test if a fd is valid
-     * @param  fd           fd to test
-     * @return 1            valid
-     *         0            invalid
+     * List directory, return basenames
      */
-    bool is_fd_valid(int fd);
+    std::list<std::string> list(const std::string& path);
+
+    /**
+     * see man 'glob'
+     */
+    std::list<std::string> glob(const std::string& pattern);
 
     /**
      * Expand a path. Do not follow symbol links.
@@ -120,7 +126,7 @@ namespace fs {
      * @return 1            accessible
      *         0            otherwise
      */
-    bool is_accessible(const std::string& path, int mode = R_OK, const std::string& work_dir = "");
+    bool is_accessible(const std::string& path, int mode = F_OK, const std::string& work_dir = "");
 
     /**
      * Write string content to file
@@ -139,13 +145,6 @@ namespace fs {
      * @return string       content read, empty if failed
      */
     std::string read(const std::string& path, size_t max_length = 1024);
-
-    /**
-     * if path is a directory
-     * @return   1          is a directory
-     *           0          not a directory
-     */
-    int is_dir(const std::string& path);
 
     /**
      * mkdir -p
