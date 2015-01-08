@@ -197,7 +197,7 @@ void Cgroup::update_output_count() {
         FILE * io = fopen((string(fs::PROC_PATH) + "/" + spid + "/io").c_str(), "r");
         if (!io) continue;
         int res = 0;
-        res = fscanf(io, "rchar: %*s\nwchar: %Ld", &bytes);
+        res = fscanf(io, "rchar: %*s\nwchar: %Lu", &bytes);
         if (res == 1) {
             if (output_counter_[pid] < bytes) output_counter_[pid] = bytes;
         }
