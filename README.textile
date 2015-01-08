@@ -8,7 +8,7 @@ h2. Dependencies
 
 h3. Runtime dependencies
 
-* *linux*: (>= 2.6.26 minimal, >= 3.8 recommended) you can check kernel config using @utils/check_linux_config.rb@.
+* *linux*: (>= 2.6.26 minimal, >= 3.8 recommended) you can check kernel config using @tools/check_linux_config.rb@.
 * *libseccomp*: (optionally, 2.x) to enable syscall filtering feature.
 
 h3. Build dependencies
@@ -40,9 +40,7 @@ h4. Configuration
 gpasswd -a username lrun
 </pre>
 
-lrun enforced several checks and settings. If you are using the latest lrun and the kernel version is greater or equal than 3.5, the user cannot use lrun for privilege escalation. (And if the kernel version < 3.5 or lrun < 0.9.9, consider lrun a privilege escalation tool)
-
-Running @lrun@ using @sudo@ is possible but be aware of security issues. If a user can run lrun using @sudo@, consider he or she has @root@ privileges. For that reason, adding @lrun@ to @sudo@ whitelist is not a good idea.
+Note: a recent kernel is strongly recommended. On Linux <= 3.5, a user in lrun group may use lrun for privilege escalation.
 
 h4. Build options
 
@@ -205,6 +203,23 @@ SIGNALED 0
 EXITCODE 1
 TERMSIG  0
 EXCEED   none
+</pre>
+
+h3. File-open filter
+
+<pre>
+% lrun --fopen-filter f:/etc/fstab d cat /etc/fstab
+cat: /etc/fstab: Operation not permitted
+</pre>
+
+<pre>
+% lrun --fopen-filter 'm:/proc:^/proc/.*stat.*$' d wc -l /proc/self/status
+wc: /proc/self/status: Operation not permitted
+</pre>
+
+<pre>
+% lrun --fopen-filter 'm:/proc:^/proc/.*stat.*$' d wc -l /proc/self/io
+7 /proc/self/io
 </pre>
 
 h3. Realtime status
