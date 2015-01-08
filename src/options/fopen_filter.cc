@@ -22,6 +22,7 @@
 
 #include <vector>
 #include <set>
+#include <map>
 #include <utility>
 #include <cstring>
 #include <cassert>
@@ -93,6 +94,8 @@ struct FilterAction {
 
 struct FilterCondition {
     virtual bool meet(const std::string& /* path */, pid_t /* pid */, uint64_t /* mask */) { return false; };
+    virtual int get_mark_flags() const { return 0; };
+    virtual std::string get_mark_path() const { return ""; };
     virtual ~FilterCondition() {};
 };
 
@@ -116,6 +119,14 @@ struct FilterCondition {
             } else return true;
         }
 
+        int get_mark_flags() const {
+            return FAN_MARK_MOUNT;
+        }
+
+        std::string get_mark_path() const {
+            return this->mount_point;
+        }
+
         RegEx * re_;
         std::string mount_point;
 
@@ -132,14 +143,17 @@ struct FilterCondition {
             return (query_path == this->path);
         }
 
+        std::string get_mark_path() const {
+            return this->path;
+        }
+
         std::string path;
     };
 
 
 static std::vector<FilterCondition*> conditions;
 static std::vector<FilterAction*> actions;
-static std::set<std::string> marked_mount_points;
-static std::set<std::string> marked_files;
+static std::map<int, std::set<std::string> > marked_paths;
 
 
 static bool is_inside_our_cgroup(pid_t pid) {
@@ -216,20 +230,11 @@ static inline void do_create_tracer() {
 static inline void do_mark_paths() {
     INFO("setting up fs tracer marks");
     for (size_t i = 0; i < conditions.size(); ++i) {
-        if (dynamic_cast<FilterConditionMountpoint*>(conditions[i]) != NULL) {
-            const std::string& mount_point = dynamic_cast<FilterConditionMountpoint*>(conditions[i])->mount_point;
-            if (marked_mount_points.count(mount_point) == 0) {
-                marked_mount_points.insert(mount_point);
-                ensure_zero(tracer->mark(mount_point.c_str(), FAN_MARK_ADD | FAN_MARK_MOUNT, FAN_OPEN_PERM));
-            }
-        } else if (dynamic_cast<FilterConditionFile*>(conditions[i]) != NULL) {
-            const std::string& path = dynamic_cast<FilterConditionFile*>(conditions[i])->path;
-            if (marked_files.count(path) == 0) {
-                marked_files.insert(path);
-                ensure_zero(tracer->mark(path.c_str(), FAN_MARK_ADD, FAN_OPEN_PERM));
-            }
-        } else {
-            assert(0);
+        int mark_flag = conditions[i]->get_mark_flags();
+        std::string path = conditions[i]->get_mark_path();
+
+        if (!path.empty()) {
+            ensure_zero(tracer->mark(path.c_str(), mark_flag | FAN_MARK_ADD, FAN_OPEN_PERM));
         }
     }
 }
