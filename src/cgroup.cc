@@ -1146,13 +1146,14 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
     INFO("child pid = %lu", (unsigned long)child_pid);
 
-    // attach child to current cgroup
-    INFO("attach %lu", (unsigned long)child_pid);
-    attach(child_pid);
-
     // child is blocking, waiting us before exec
     // it's time to call callback and let the child go
     if (arg.callback_parent) arg.callback_parent((void *) &arg);
+
+    // attach child to current cgroup. cpu and memory
+    // resource counter start to work from here
+    INFO("attach %lu", (unsigned long)child_pid);
+    attach(child_pid);
 
     strncpy(buf, "RUN", sizeof buf);
     close(arg.sockets[0]);

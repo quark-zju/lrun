@@ -155,17 +155,6 @@ static void create_cgroup() {
     config.active_cgroup = &new_cg;
 }
 
-static void cgroup_callback_parent(void * /* args */) {
-    Cgroup& cg = *config.active_cgroup;
-
-    // reset cpu usage, it is not really necessary but makes cpu time accounting
-    // slightly more accurate.
-    int ret;
-    ret = cg.reset_cpu_usage();
-    (void)ret;
-
-}
-
 static void cgroup_callback_child(void * /* args */) {
     // apply fs tracer (fanotify) settings
     // this must be done in child context because it has different fs context
@@ -223,7 +212,9 @@ static void configure_cgroup() {
     }
 
     // setup callback
-    config.arg.callback_parent = &cgroup_callback_parent;
+    // use child callback to set up fs tracer marks. this is doable
+    // using spawn_arg but that will make cgroup coupled with
+    // complicated fs tracer.
     config.arg.callback_child = &cgroup_callback_child;
 }
 
