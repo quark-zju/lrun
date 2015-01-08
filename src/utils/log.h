@@ -29,12 +29,12 @@
 
 
 #ifdef NDEBUG
-  #define SHOW_SOURCE_LOCATION ;
-  #define PRINT_TIMESTAMP ;
-  #define INFO(...) ;
-  #define PROGRESS_INFO(...) ;
+  #define SHOW_SOURCE_LOCATION {};
+  #define PRINT_TIMESTAMP {};
+  #define INFO(...) {};
+  #define PROGRESS_INFO(...) {};
   #define DEBUG_DO if (0)
-  #define SCOPED_LOG_LOCK ;
+  #define SCOPED_LOG_LOCK {};
   #define flog 0
 #else
   #include <unistd.h>
