@@ -21,7 +21,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "log.h"
+#include <cstdio>
 
-#define ensure(exp) { if ((exp) == 0) FATAL("%s", "ensure failed: " # exp); }
-#define ensure_zero(exp) { if ((exp) != 0) FATAL("%s", "ensure_zero failed: " # exp); }
+#define ensure(exp) { if ((exp) == 0) { fprintf(stderr, "ensure failed: %s\n", # exp); exit(1); } }
+#define ensure_zero(exp) { if ((exp) != 0) { fprintf(stderr, "ensure_zero failed: %s\n", # exp); exit(1); } }
