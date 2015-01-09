@@ -242,19 +242,5 @@ namespace fs {
         private:
             int fd_;
     };
-
-    class PathNode {
-        public:
-            void set(const char path[], int flag, int wildcard = 0);
-            int get(const char path[]);
-
-            PathNode();
-            ~PathNode();
-
-        private:
-            PathNode* walk(const char *p, int ttl);
-            std::map<char, PathNode*> children_;
-            int flag_;
-    };
 }
 
