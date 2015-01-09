@@ -236,7 +236,7 @@ There are some related utilities in @utils@ directory. You may find some of them
 
 h3. mirrorfs
 
-`mirrorfs` helps to set up chroot environments by mirror partial of the current filesystem. Its source is at @utils/mirrofs@. Its binary is available as lrun-mirrorfs in deb package.
+A utility helps to set up chroot environments by mirror partial of the current filesystem. The binary is available as lrun-mirrorfs in deb package.
 
 h2. Troubleshooting
 
