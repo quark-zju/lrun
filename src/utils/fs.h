@@ -119,6 +119,15 @@ namespace fs {
     std::string resolve(const std::string& path);
 
     /**
+     * Convert absolute path to relative path
+     * ex. relative_path("/a/b/c", "/a/d/e") = "../b/c"
+     * @param  path         absolute path to convert (must be absolute)
+     * @param  reference    reference path (must be absolute)
+     * @return path         resolved relative path
+     */
+    std::string relative_path(const std::string& path, const std::string& reference);
+
+    /**
      * Test access to a specified file
      * @param  path         relative or absolute path
      * @param  mode         refer to `man faccessat`

@@ -212,6 +212,7 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
             config.arg.bindfs_list.push_back(make_pair(dest, src));
             config.arg.bindfs_dest_set.insert(dest);
         } else if (option == "bindfs-ro") {
+            // bindfs + remount-ro
             REQUIRE_NARGV(2);
             string dest = NEXT_STRING_ARG;
             string src = NEXT_STRING_ARG;

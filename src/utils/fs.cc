@@ -177,6 +177,27 @@ string fs::resolve(const string& path) {
     }
 }
 
+string fs::relative_path(const string& path, const std::string& reference) {
+    // common prefix, must stop at '/'
+    size_t common_prefix_len = 0;
+    for (size_t i = 0; ; ++i) {
+        if (i >= reference.length() || i >= path.length() || path[i] != reference[i]) {
+            break;
+        } else if (reference[i] == PATH_SEPARATOR) {
+            common_prefix_len = i + 1;
+        }
+    }
+
+    string result = "";
+    for (size_t i = common_prefix_len; i < reference.length() ; ++i) {
+        if (reference[i] == PATH_SEPARATOR) {
+            result += "../";
+        }
+    }
+
+    return result + path.substr(common_prefix_len, string::npos);
+}
+
 bool fs::is_accessible(const string& path, int mode, const string& work_dir) {
     int dirfd = AT_FDCWD;
     bool result = false;
@@ -314,7 +335,7 @@ int fs::mount_bind(const string& src, const string& dest) {
     int e = mount(src.c_str(),
                   dest.c_str(),
                   NULL,
-                  MS_BIND | MS_NOSUID,
+                  MS_BIND,
                   NULL);
     return e;
 }
@@ -377,7 +398,10 @@ std::string fs::get_mount_point(const std::string& path) {
 
 fs::ScopedFileLock::ScopedFileLock(const char path[]) {
     int fd = open(path, O_RDONLY);
-    if (fd < 0) return;
+    if (fd < 0) {
+        this->fd_ = -1;
+        return;
+    }
     if (flock(fd, LOCK_EX) == 0) {
         this->fd_ = fd;
     } else {

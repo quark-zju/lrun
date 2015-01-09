@@ -8,7 +8,7 @@ h2. Dependencies
 
 h3. Runtime dependencies
 
-* *linux*: (>= 2.6.26 minimal, >= 3.8 recommended) you can check kernel config using @tools/check_linux_config.rb@.
+* *linux*: (>= 2.6.26 minimal, >= 3.12 recommended) you can check kernel config using @utils/check_linux_config.rb@.
 * *libseccomp*: (optionally, 2.x) to enable syscall filtering feature.
 
 h3. Build dependencies
@@ -40,7 +40,7 @@ h4. Configuration
 gpasswd -a username lrun
 </pre>
 
-Note: a recent kernel is strongly recommended. On Linux <= 3.5, a user in lrun group may use lrun for privilege escalation.
+Note: On Linux <= 3.5, if sudo is installed, a user in lrun group can use lrun for privilege escalation.
 
 h4. Build options
 
@@ -233,6 +233,10 @@ Use @--status@ to show realtime cpu, memory usage information:
 h2. Utilities
 
 There are some related utilities in @utils@ directory. You may find some of them helpful.
+
+h3. mirrorfs
+
+`mirrorfs` helps to set up chroot environments by mirror partial of the current filesystem. Its source is at @utils/mirrofs@. Its binary is available as lrun-mirrorfs in deb package.
 
 h2. Troubleshooting
 
