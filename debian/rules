@@ -4,8 +4,9 @@ DEB_BUILD_HARDENING=1
 DPKG_EXPORT_BUILDFLAGS=1
 include /usr/share/dpkg/buildflags.mk
 
-export NOSUDO=1
+# do not let lrun create a 'lrun' group.
 export LRUN_GROUP=root
+export NOSUDO=1
 
 %:
 	dh ${@}

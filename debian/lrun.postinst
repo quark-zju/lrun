@@ -10,9 +10,13 @@ case "${1}" in
 			addgroup --system lrun
 		fi
 
-		if ! dpkg-statoverride --list /usr/bin/lrun >/dev/null; then
+		if ! dpkg-statoverride --list /usr/bin/lrun; then
 			chown root:lrun /usr/bin/lrun
 			chmod 4550 /usr/bin/lrun
+		fi
+		if ! dpkg-statoverride --list /usr/bin/lrun-mirrorfs; then
+			chown root:lrun /usr/bin/lrun-mirrorfs
+			chmod 4550 /usr/bin/lrun-mirrorfs
 		fi
 		;;
 
