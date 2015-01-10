@@ -9,5 +9,6 @@ mirror /lib64/
 mirror /usr/bin/python{,[0-9].[0-9]}
 # debian-ish
 mirror /etc/alternatives/
+mirror /etc/python*/
 # python requires passwd to know current user name
 mirror /etc/passwd

@@ -47,7 +47,7 @@ using std::set;
 // http://lwn.net/Articles/436012/
 # define MIRRORFS_ROOT "/run/lrun/mirrorfs"
 #endif
-#define VERSION "v0.1"
+#define VERSION "v0.2"
 
 #define describe_step(...) { if (fstep_log) { fprintf(fstep_log, __VA_ARGS__); fprintf(fstep_log, "\n"); } }
 
@@ -440,51 +440,58 @@ static void add_symlink_step(string existing_path, string new_path) {
     steps.push_back(new StepSymlink(fs::relative_path(existing_path, new_path), fs::join(dest, new_path)));
 }
 
+static string strip_tailing_path_separator(const string& path) {
+    if (path.empty()) return "";
+    if (path.data()[path.length() - 1] == '/') {
+        return path.substr(0, path.length() - 1);
+    } else {
+        return path;
+    }
+}
+
+static int mirror_path_to_steps(string path, bool is_dir, bool print_warning = true) {
+    path = strip_tailing_path_separator(path);
+    if (fs::is_symlink(path)) {
+        string target = fs::resolve(path);
+        if (target.empty()) return 0;
+        add_symlink_step(target, path);
+    } else if (fs::is_dir(path)) {
+        if (!is_dir) {
+            if (print_warning) fprintf(stderr, "warning: %s is a diretory, you should put a '/' at the end of it to explicitly match a directory. for now it will be ignored\n", path.c_str());
+            return 0;
+        }
+        add_mount_bind_step(path, /* is_dir */ true);
+    } else if (fs::is_regular_file(path)) {
+        if (is_dir) {
+            if (print_warning) fprintf(stderr, "warning: %s is not a directory\n", path.c_str());
+            return 0;
+        }
+        add_mount_bind_step(path, /* is_dir */ false);
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
 static void command_to_steps(string command, string argument) {
     if (argument.empty() || command.empty()) return;
 
     if (command == "mirror") {
         ensure_absolute_expanded_path(argument);
 
-        if (argument.data()[argument.length() - 1] == '/') {
-            // argument is a directory
-            string path = argument.substr(0, argument.length() - 1);
-            if (path.empty()) path = "/";
-            if (!fs::is_dir(path)) {
-                fprintf(stderr, "warning: %s is not a diretory and will be ignored\n", path.c_str());
-                return;
-            }
-            if (fs::is_symlink(path)) {
-                string target = fs::resolve(path);
-                if (!target.empty()) add_symlink_step(target, path);
-            } else {
-                add_mount_bind_step(path, /* is_dir */ true);
-            }
-        } else if (fs::is_accessible(argument, F_OK)) {
-            if (fs::is_dir(argument)) {
-                fprintf(stderr, "warning: %s is a diretory, you should put a '/' at the end of it to explicitly match a directory. for now it will be ignored\n", argument.c_str());
-                return;
-            }
-            // argument is a path (also a glob pattern)
-            add_mount_bind_step(argument, /* is_dir */ false);
+        bool is_dir = (argument.data()[argument.length() - 1] == '/');
+
+        if (fs::is_accessible(argument, F_OK)) { // exist, use directly
+            mirror_path_to_steps(argument, is_dir);
         } else {
             // argument is a glob pattern
             list<string> paths = fs::glob(argument);
-            bool empty = true;
+            int count = 0;
             for (const string& path: paths) {
-                if (fs::is_regular_file(path)) {
-                    empty = false;
-                    add_mount_bind_step(path, /* is_dir */ false);
-                } else if (fs::is_symlink(path)) {
-                    string target = fs::resolve(path);
-                    if (!target.empty()) {
-                        empty = false;
-                        add_symlink_step(target, path);
-                    }
-                }
+                count += mirror_path_to_steps(path, is_dir, /* print warning */ false);
             }
-            if (empty) {
-                fprintf(stderr, "warning: %s does not match any files and is ignored\n", argument.c_str());
+            if (!count) {
+                fprintf(stderr, "warning: %s does not match any %s and is ignored\n", argument.c_str(), is_dir ? "directories" : "files");
             }
         }
     } else if (command == "mkdir") {
@@ -574,7 +581,7 @@ const int STEP_BEGIN_IGNORE = -1;
 const int STEP_MAX = 256;
 
 static void check_step_limit() {
-    if (steps.size() > STEP_MAX) {
+    if ((unsigned)steps.size() > (unsigned)STEP_MAX) {
         fprintf(stderr, "too many steps (%d > %d)\n", (int)steps.size(), STEP_MAX);
         exit(1);
     }
