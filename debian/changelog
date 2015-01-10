@@ -1,3 +1,9 @@
+lrun (1.1.2) unstable; urgency=low
+
+  * lrun-mirrorfs: allow glob pattern on directories.
+
+ -- Jun Wu <quark@lihdd.net>  Sat, 10 Jan 2014 22:01:07 +0800
+
 lrun (1.1.1) unstable; urgency=low
 
   * New utility helping create chroot environments - mirrorfs.
