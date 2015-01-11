@@ -79,6 +79,7 @@ void fs::Tracer::process_events() {
                 (void)ret;
             }
 
+            close(metadata->fd);
             metadata = FAN_EVENT_NEXT(metadata, len);
         }
     }
