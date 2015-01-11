@@ -242,8 +242,12 @@ h2. Troubleshooting
 
 *Error: "FATAL: can not mount cgroup memory on '/sys/fs/cgroup/memory' (No such file or directory)"*
 
-You may be using Debian. Memory controller is compiled but deactivated. Try adding @cgroup_enable=memory@ as a kernel parameter.
+You are probably using Debian. Memory controller is compiled but deactivated. Try adding @cgroup_enable=memory@ as a kernel parameter.
 When using grub2, this can be done by editing @GRUB_CMDLINE_LINUX@ in @/etc/default/grub@ and running @update-grub2@.
+
+*File-open filter cannot be used*
+
+You are probably using Debian. File-open filter requires the kernel to be compiled with @CONFIG_FANOTIFY_ACCESS_PERMISSIONS@. Sadly Debian "refused":https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=690737 to enable it.
 
 *dmesg prints @trap ... ip:... sp:... in ...@ and I don't want to see them*
 
