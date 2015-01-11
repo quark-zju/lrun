@@ -38,14 +38,18 @@ namespace lrun {
         void parse(int argc, char * argv[], lrun::MainConfig& config);
 
         namespace fstracer {
-            // start tracer thread and apply pending settings
             // fstracer need cgroup information to:
             // - check if a process belongs to this cgroup
             // - reset timer
-            void start(lrun::Cgroup& cgroup, const std::string& chroot_path);
+            void setup(lrun::Cgroup& cgroup, const std::string& chroot_path);
+
+            // start tracer process. call this after setup()
+            void start();
+
+            // stop tracer process and free related resources. call this after start()
             void stop();
 
-            // options::fopen_filter does not actually apply any settings.
+            // call this before start(), after setup()
             int apply_settings();
 
             bool alive();

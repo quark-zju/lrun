@@ -307,12 +307,9 @@ namespace lrun {
                 int remount_dev;            // Recreate a minimal dev
                 std::list<std::pair<std::string, std::string> > env_list;
                                             // environment variables whitelist
-                cgroup_callback_func * callback_parent;
-                                            // callback function, just before seccomp and execve
-                                            // run in the context of parent process
                 cgroup_callback_func * callback_child;
-                                            // like callback_parent but run in the context of
-                                            // child process
+                                            // callback function, just *before* seccomp and execve.
+                                            // run in the context of child process
             };
 
             /**

@@ -909,8 +909,6 @@ static int clone_init_fn(void *) {
         FOR_EACH(fd, fds) close(fd);
     }
 
-    pthread_setname_np(pthread_self(), "lrun:pidnsinit");
-
     while (1) pause();
     return 0;
 }
@@ -965,21 +963,26 @@ static int clone_main_fn(void * clone_arg) {
     // if exec fails, it will be closed upon process exit (aka. this function returns)
     fd_set_cloexec(arg.sockets[0]);
 
-    // it's time for callback
+    // it's time for callback, write log first because fanotify may block us from
+    // doing that
     int callback_ret = 0;
-    if (arg.callback_child) callback_ret = arg.callback_child((void *) &arg);
+    if (arg.callback_child) {
+        INFO("will run callback and execvp %s ...", arg.args[0]);
+        callback_ret = arg.callback_child((void *) &arg);
+    } else {
+        INFO("will execvp %s ...", arg.args[0]);
+    }
 
     if (callback_ret == 0) {
         // exec target. syscall filter must be done just before execve because we need other
         // syscalls in above code.
-        INFO("will execvp %s ...", arg.args[0]);
         do_seccomp(arg);
         execvp(arg.args[0], arg.args);
+        // if exec fails, write reason down (child knows more details than parent)
+        ERROR("exec '%s' failed", arg.args[0]);
     }
 
-    // exec or callback failed, output to stderr
-    ERROR("exec '%s' failed", arg.args[0]);
-
+    // exec or callback failed
     // notify parent that exec failed
     strncpy(buf, "ERR", sizeof buf);
     ret = write(arg.sockets[0], buf, sizeof buf);
@@ -1149,20 +1152,13 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
     INFO("child pid = %lu", (unsigned long)child_pid);
 
-    // child is blocking, waiting us before exec
-    // it's time to call callback and let the child go
-    if (arg.callback_parent) {
-        int ret = arg.callback_parent((void *) &arg);
-        if (ret != 0) {
-            WARNING("callback_parent failed");
-        }
-    }
-
     // attach child to current cgroup. cpu and memory
     // resource counter start to work from here
     INFO("attach %lu", (unsigned long)child_pid);
     attach(child_pid);
 
+    // child is blocking, waiting us before exec
+    // it's time to let the child go
     strncpy(buf, "RUN", sizeof buf);
     close(arg.sockets[0]);
     ret = send(arg.sockets[1], buf, sizeof buf, MSG_NOSIGNAL);
@@ -1188,14 +1184,16 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     if (read(arg.sockets[1], buf, sizeof buf) > 0 && buf[0] == 'E') {  // "ERR"
         INFO("seems child exec failed");
         child_pid = -4;
-    } else {
-        // disable oom killer because it will make dmesg noisy.
-        // Note: a process can enter D (uninterruptable sleep) status
-        // when oom killer disabled, killing it requires re-enable oom killer
-        // or enlarge memory limit
-        INFO("disabling oom killer");
-        if (set(CG_MEMORY, "memory.oom_control", "1\n")) INFO("can not set memory.oom_control");
+        goto cleanup;
     }
+
+    // the child has exec successfully
+    // disable oom killer because it will make dmesg noisy.
+    // Note: a process can enter D (uninterruptable sleep) status
+    // when oom killer disabled, killing it requires re-enable oom killer
+    // or enlarge memory limit
+    INFO("disabling oom killer");
+    if (set(CG_MEMORY, "memory.oom_control", "1\n")) INFO("can not set memory.oom_control");
 
 cleanup:
     close(arg.sockets[1]);

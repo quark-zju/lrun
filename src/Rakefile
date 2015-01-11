@@ -69,7 +69,8 @@ def pkgconfig(params)
 end
 
 def try_cxxflags(flags, start_with_check = nil)
-  # check existing flags
+  # check existing flags, if some is start_with `start_with_check`, then
+  # just use it
   @existing_flags ||= CXXFLAGS.split
   start_with_check ||= flags.first.gsub(/=.*$/, '')
   return '' if @existing_flags.any? {|f| f.start_with?(start_with_check)}
@@ -160,7 +161,6 @@ rule '.o' => '.cc' do |t|
            try_cxxflags(['-D_FORTIFY_SOURCE=2'], '-D_FORTIFY_SOURCE'),
            try_cxxflags(['-Os'], '-O'),
            CXXFLAGS, NODEBUG_FLAG, NOLIBSF_FLAG,
-           '-pthread',
            "-DLIBSECCOMP_VERSION_MAJOR=#{NOSECCOMP ? 0 : get_libseccomp_version}",
            "-DVERSION=\\\"#{get_version}\\\"",
            get_libseccomp_cflags].join(' ')
@@ -170,7 +170,7 @@ end
 
 file BIN => OBJ do |t|
   require_executable! LD
-  sh "#{LD} #{LDFLAGS} -pthread -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs} #{get_other_libs}"
+  sh "#{LD} #{LDFLAGS} -o #{t.name} #{t.prerequisites * ' '} #{get_libseccomp_libs} #{get_other_libs}"
 end
 
 task :lrun_group do |t|

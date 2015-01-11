@@ -36,7 +36,6 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <grp.h>
-#include <pthread.h>
 #include "utils/ensure.h"
 #include "utils/for_each.h"
 #include "utils/fs.h"
@@ -232,8 +231,9 @@ static int run_command() {
         }
     }
 
-    // start fs tracing thread
-    lrun::options::fstracer::start(cg, config.arg.chroot_path);
+    // setup and start fs tracing (fanotify)
+    lrun::options::fstracer::setup(cg, config.arg.chroot_path);
+    lrun::options::fstracer::start();
 
     // spawn child
     pid_t pid = 0;
@@ -245,7 +245,7 @@ static int run_command() {
     pid = cg.spawn(config.arg);
 
     if (pid <= 0) {
-        // error messages are printed before
+        // error messages are printed before, by child
         clean_cg_exit(cg, 10 - pid);
     }
 
@@ -273,9 +273,9 @@ static int run_command() {
             clean_cg_exit(cg, 4);
         }
 
-        // check fs tracer thread
+        // check fs tracer process
         if (options::fstracer::started() && !options::fstracer::alive()) {
-            fprintf(stderr, "Filesystem tracer thread was killed, exiting...\n");
+            fprintf(stderr, "Filesystem tracer process was killed, exiting...\n");
             fflush(stderr);
             clean_cg_exit(cg, 5);
         }

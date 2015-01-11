@@ -62,7 +62,6 @@ MainConfig::MainConfig() {
     this->arg.clone_flags = 0;
     this->arg.stdout_fd = STDOUT_FILENO;
     this->arg.stderr_fd = STDERR_FILENO;
-    this->arg.callback_parent = NULL;
     this->arg.callback_child = NULL;
 
     // arg.rlimits settings

@@ -28,8 +28,9 @@
 #include <cassert>
 #include <signal.h>
 #include <fcntl.h>
-#include <sys/types.h>
+#include <sys/prctl.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include "options.h"
 #include "../utils/ensure.h"
 #include "../utils/fs.h"
@@ -39,7 +40,7 @@
 #include "../config.h"
 
 
-static pthread_t tracer_thread_id;
+static pid_t tracer_pid;
 static fs::Tracer * tracer;
 static lrun::Cgroup * tracer_cgroup;
 static std::string child_chroot_path;
@@ -178,20 +179,22 @@ static int fs_trace_callback(const char path[], int fd, pid_t pid, uint64_t mask
     return 0;
 }
 
-static void * fs_tracer_thread(void *data) {
-    fs::Tracer *tracer = (fs::Tracer*) data;
-    if (!tracer) return 0;
-    pthread_setname_np(pthread_self(), "lrun:fstracer");
+static int fs_tracer_proc(void *) {
+    // kill us when parent dies
+    prctl(PR_SET_PDEATHSIG, SIGKILL);
+    if (!tracer) return 1;
+    INFO("fs tracer is running");
     while (1) {
         tracer->process_events();
     }
-    return NULL;
+    exit(0);
+    return 0;
 }
 
 void lrun::options::fstracer::stop() {
-    if (tracer_thread_id) {
-        pthread_cancel(tracer_thread_id);
-        tracer_thread_id = 0;
+    if (tracer_pid) {
+        kill(tracer_pid, SIGKILL);
+        tracer_pid = 0;
     }
     if (tracer) {
         delete tracer;
@@ -208,22 +211,20 @@ void lrun::options::fstracer::stop() {
 }
 
 bool lrun::options::fstracer::started() {
-    return tracer_thread_id != 0;
+    return tracer_pid != 0;
 }
 
 bool lrun::options::fstracer::alive() {
-    return tracer_thread_id != 0 && pthread_kill(tracer_thread_id, 0) == 0;
+    return tracer_pid != 0 && kill(tracer_pid, 0) == 0;
 }
 
 static inline void do_create_tracer() {
-    if (!tracer) {
-        tracer = new fs::Tracer();
-        if (tracer->init(
-                    FAN_CLASS_PRE_CONTENT | FAN_CLOEXEC | FAN_UNLIMITED_QUEUE,
-                    O_RDONLY,
-                    &fs_trace_callback)) {
-            FATAL("can not init fs tracer");
-        }
+    tracer = new fs::Tracer();
+    if (tracer->init(
+                FAN_CLASS_PRE_CONTENT | FAN_CLOEXEC | FAN_UNLIMITED_QUEUE,
+                O_RDONLY,
+                &fs_trace_callback)) {
+        FATAL("can not init fs tracer");
     }
 }
 
@@ -244,27 +245,36 @@ static inline int do_mark_paths() {
 }
 
 
-static inline void do_start_tracer_thread() {
-    if (!tracer_thread_id) {
-        INFO("starting fs tracer thread");
-        pthread_attr_t attr;
-        ensure_zero(pthread_attr_init(&attr));
-        // the thread must be joinable so that we can reliably use pthread_kill to detect if it is alive
-        ensure_zero(pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE));
-        pthread_create(&tracer_thread_id, NULL, &fs_tracer_thread, (void*) tracer);
-        ensure_zero(pthread_attr_destroy(&attr));
+static inline void do_start_tracer_process() {
+    INFO("starting fs tracer process");
+
+    long stack_size = sysconf(_SC_PAGESIZE) * 2;
+    pid_t pid = clone(
+            fs_tracer_proc,
+            (void*)((char*)alloca(stack_size) + stack_size),
+            CLONE_FILES,
+            NULL);
+
+    if (pid == -1) {
+        FATAL("cannot create tracer process");
+    } else {
+        tracer_pid = pid;
     }
 }
 
-void lrun::options::fstracer::start(lrun::Cgroup& cgroup, const std::string& chroot_path) {
+void lrun::options::fstracer::setup(lrun::Cgroup& cgroup, const std::string& chroot_path) {
     // be smart, if either conditions or actions
     if (conditions.empty() || actions.empty()) return;
 
     tracer_cgroup = &cgroup;
     child_chroot_path = chroot_path;
 
-    do_create_tracer();
-    do_start_tracer_thread();
+    if (!tracer) do_create_tracer();
+}
+
+void lrun::options::fstracer::start() {
+    if (!tracer) return;
+    if (!tracer_pid) do_start_tracer_process();
 }
 
 int lrun::options::fstracer::apply_settings() {
