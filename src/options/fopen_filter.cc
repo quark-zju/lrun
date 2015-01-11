@@ -227,16 +227,20 @@ static inline void do_create_tracer() {
     }
 }
 
-static inline void do_mark_paths() {
-    INFO("setting up fs tracer marks");
+static inline int do_mark_paths() {
     for (size_t i = 0; i < conditions.size(); ++i) {
         int mark_flag = conditions[i]->get_mark_flags();
         std::string path = conditions[i]->get_mark_path();
 
         if (!path.empty()) {
-            ensure_zero(tracer->mark(path.c_str(), mark_flag | FAN_MARK_ADD, FAN_OPEN_PERM));
+            int ret = tracer->mark(path.c_str(), mark_flag | FAN_MARK_ADD, FAN_OPEN_PERM);
+            if (ret != 0) {
+                ERROR("cannot mark path");
+            }
+            return ret;
         }
     }
+    return 0;
 }
 
 
@@ -263,8 +267,9 @@ void lrun::options::fstracer::start(lrun::Cgroup& cgroup, const std::string& chr
     do_start_tracer_thread();
 }
 
-void lrun::options::fstracer::apply_settings() {
-    if (tracer) do_mark_paths();
+int lrun::options::fstracer::apply_settings() {
+    if (tracer) return do_mark_paths();
+    else return 0;
 }
 
 

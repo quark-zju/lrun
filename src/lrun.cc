@@ -156,10 +156,11 @@ static void create_cgroup() {
     config.active_cgroup = &new_cg;
 }
 
-static void cgroup_callback_child(void * /* args */) {
+static int cgroup_callback_child(void * /* args */) {
     // apply fs tracer (fanotify) settings
     // this must be done in child context because it has different fs context
-    lrun::options::fstracer::apply_settings();
+    int ret = lrun::options::fstracer::apply_settings();
+    return ret;
 }
 
 static void configure_cgroup() {

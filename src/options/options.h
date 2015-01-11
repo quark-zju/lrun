@@ -46,7 +46,7 @@ namespace lrun {
             void stop();
 
             // options::fopen_filter does not actually apply any settings.
-            void apply_settings();
+            int apply_settings();
 
             bool alive();
             bool started();

@@ -36,7 +36,7 @@
 
 namespace lrun {
     class Cgroup;
-    typedef void cgroup_callback_func(void *);
+    typedef int cgroup_callback_func(void *);
 
     class Cgroup {
         public:

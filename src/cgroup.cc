@@ -966,15 +966,18 @@ static int clone_main_fn(void * clone_arg) {
     fd_set_cloexec(arg.sockets[0]);
 
     // it's time for callback
-    if (arg.callback_child) arg.callback_child((void *) &arg);
+    int callback_ret = 0;
+    if (arg.callback_child) callback_ret = arg.callback_child((void *) &arg);
 
-    // exec target. syscall filter must be done just before execve because we need other
-    // syscalls in above code.
-    INFO("will execvp %s ...", arg.args[0]);
-    do_seccomp(arg);
-    execvp(arg.args[0], arg.args);
+    if (callback_ret == 0) {
+        // exec target. syscall filter must be done just before execve because we need other
+        // syscalls in above code.
+        INFO("will execvp %s ...", arg.args[0]);
+        do_seccomp(arg);
+        execvp(arg.args[0], arg.args);
+    }
 
-    // exec failed, output to stderr
+    // exec or callback failed, output to stderr
     ERROR("exec '%s' failed", arg.args[0]);
 
     // notify parent that exec failed
@@ -1148,7 +1151,12 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
 
     // child is blocking, waiting us before exec
     // it's time to call callback and let the child go
-    if (arg.callback_parent) arg.callback_parent((void *) &arg);
+    if (arg.callback_parent) {
+        int ret = arg.callback_parent((void *) &arg);
+        if (ret != 0) {
+            WARNING("callback_parent failed");
+        }
+    }
 
     // attach child to current cgroup. cpu and memory
     // resource counter start to work from here
