@@ -47,7 +47,7 @@ using std::set;
 // http://lwn.net/Articles/436012/
 # define MIRRORFS_ROOT "/run/lrun/mirrorfs"
 #endif
-#define VERSION "v0.2"
+#define VERSION "v0.3"
 
 #define describe_step(...) { if (fstep_log) { fprintf(fstep_log, __VA_ARGS__); fprintf(fstep_log, "\n"); } }
 
@@ -270,6 +270,8 @@ static void print_help(const char arg0[]) {
             "  - mkdir $path\n"
             "    mkdir -p $dest/$path\n"
             "    the directory will be owned by root:root and have mode 0555.\n"
+            "  - touch $path\n"
+            "    create an empty file at $dest/$path\n"
             "  - mirror $path\n"
             "    mount --bind $path $dest/$path -o ro\n"
             "    if $path is a directory, it must end with '/'\n"
@@ -476,10 +478,9 @@ static int mirror_path_to_steps(string path, bool is_dir, bool print_warning = t
 static void command_to_steps(string command, string argument) {
     if (argument.empty() || command.empty()) return;
 
+    bool is_dir = (argument.data()[argument.length() - 1] == '/');
     if (command == "mirror") {
         ensure_absolute_expanded_path(argument);
-
-        bool is_dir = (argument.data()[argument.length() - 1] == '/');
 
         if (fs::is_accessible(argument, F_OK)) { // exist, use directly
             mirror_path_to_steps(argument, is_dir);
@@ -494,11 +495,17 @@ static void command_to_steps(string command, string argument) {
                 fprintf(stderr, "warning: %s does not match any %s and is ignored\n", argument.c_str(), is_dir ? "directories" : "files");
             }
         }
-    } else if (command == "mkdir") {
-        string path = argument;
-        if (path.length() > 1 && argument.data()[argument.length() - 1] == '/') {
-            path = path.substr(0, path.length() - 1);
+    } else if (command == "touch") {
+        if (is_dir) {
+            fprintf(stderr, "error: cannot touch a directory %s\n", argument.c_str());
+            exit(1);
         }
+        string path = strip_tailing_path_separator(argument);
+        ensure_absolute_expanded_path(path);
+        add_mkdir_step(fs::dirname(path));
+        steps.push_back(new StepTouch(fs::join(dest, path)));
+    } else if (command == "mkdir") {
+        string path = strip_tailing_path_separator(argument);
         ensure_absolute_expanded_path(path);
         add_mkdir_step(path);
     }
