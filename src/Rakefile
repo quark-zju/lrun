@@ -102,15 +102,20 @@ def get_version
 end
 
 def get_libseccomp_version
-  @libseccomp_version ||= if NOSECCOMP
-    0
-  elsif executable_exists?('pkg-config')
-    pkgconfig('--modversion libseccomp').to_i
-  elsif File.exist?('/usr/include/seccomp.h')
-    [2].find do |ver|
-      which("libseccomp.so.#{ver}", '/usr/lib:/usr/local/lib')
-    end || 0
-  end
+  @libseccomp_version ||=\
+    begin
+      if NOSECCOMP
+        0
+      elsif executable_exists?('pkg-config')
+        pkgconfig('--modversion libseccomp').to_i
+      elsif File.exist?('/usr/include/seccomp.h')
+        [2].find do |ver|
+          which("libseccomp.so.#{ver}", '/usr/lib:/usr/local/lib')
+        end || 0
+      else
+        0
+      end
+    end
 end
 
 def get_libseccomp_libs
@@ -161,7 +166,7 @@ rule '.o' => '.cc' do |t|
            try_cxxflags(['-D_FORTIFY_SOURCE=2'], '-D_FORTIFY_SOURCE'),
            try_cxxflags(['-Os'], '-O'),
            CXXFLAGS, NODEBUG_FLAG, NOLIBSF_FLAG,
-           "-DLIBSECCOMP_VERSION_MAJOR=#{NOSECCOMP ? 0 : get_libseccomp_version}",
+           "-DLIBSECCOMP_VERSION_MAJOR=#{get_libseccomp_version}",
            "-DVERSION=\\\"#{get_version}\\\"",
            get_libseccomp_cflags].join(' ')
   require_executable! CXX

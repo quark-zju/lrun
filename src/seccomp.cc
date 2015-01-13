@@ -299,7 +299,7 @@ int sc::supported() {
 #else
 
 sc::Rules::Rules(action_t, uint64_t) {}
-int sc::Rules::add_simple_filter(const char * const filter) { return 3; }
+int sc::Rules::add_simple_filter(const char * const /* filter */) { return 3; }
 int sc::Rules::apply() { return 1; }
 sc::Rules::~Rules() {}
 
