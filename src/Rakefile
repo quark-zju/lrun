@@ -110,7 +110,7 @@ def get_libseccomp_version
         pkgconfig('--modversion libseccomp').to_i
       elsif File.exist?('/usr/include/seccomp.h')
         [2].find do |ver|
-          which("libseccomp.so.#{ver}", '/usr/lib:/usr/local/lib')
+          which("libseccomp.so.#{ver}", '/usr/lib:/usr/local/lib:/usr/lib/x86_64-linux-gnu')
         end || 0
       else
         0
