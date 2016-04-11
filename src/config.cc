@@ -217,10 +217,10 @@ void MainConfig::check() {
     }
 
     if (error_messages.size() > 0) {
+        fprintf(stderr, "Please fix these issues and try again:\n");
         FOR_EACH(message, error_messages) {
-            fprintf(stderr, "%s\n\n", message.c_str());
+            fprintf(stderr, "* %s\n", message.c_str());
         }
-        fprintf(stderr, "Please fix above issues and try again.\n");
         exit(1);
     }
 }
