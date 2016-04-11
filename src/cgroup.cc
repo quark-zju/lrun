@@ -594,7 +594,7 @@ static list<int> get_fds() {
             int fd = -1;
             if (sscanf(name, "%d", &fd) != 1) continue;
             // scandir will use a dirfd. verify existance of fds
-            if (fd >= 0 && fcntl(fd, F_GETFD) != -1)
+            if (fs::is_fd_valid(fd))
                 fds.push_back(fd);
         }
         free(namelist[i]);

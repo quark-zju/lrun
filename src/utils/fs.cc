@@ -120,10 +120,7 @@ bool fs::is_disconnected(const string& path) {
 }
 
 bool fs::is_fd_valid(int fd) {
-    char buf[sizeof(int) * 3 + 2];
-    snprintf(buf, sizeof(buf), "%d", fd);
-    buf[sizeof(buf) - 1] = 0;
-    return fs::is_accessible("/proc/self/fd/" + string(buf), F_OK);
+    return fd >= 0 && fcntl(fd, F_GETFD) != -1;
 }
 
 string fs::expand(const string& path) {
