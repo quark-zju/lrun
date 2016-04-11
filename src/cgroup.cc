@@ -591,9 +591,11 @@ static list<int> get_fds() {
         const char * name = namelist[i]->d_name;
         // skip . and ..
         if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
-            int fd;
+            int fd = -1;
             if (sscanf(name, "%d", &fd) != 1) continue;
-            fds.push_back(fd);
+            // scandir will use a dirfd. verify existance of fds
+            if (fd >= 0 && fcntl(fd, F_GETFD) != -1)
+                fds.push_back(fd);
         }
         free(namelist[i]);
     }
