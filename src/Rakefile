@@ -1,5 +1,12 @@
 require 'rake/clean'
 
+# Setup
+# -----
+
+# Hack Debian PATH
+ENV['PATH'] = ENV['PATH'] + ':/sbin:/usr/sbin'
+
+# Environment constants
 SRC          = FileList['*.cc', 'options/*.cc', 'utils/*.cc']
 OBJ          = SRC.ext('o')
 BIN          = 'lrun'
@@ -35,8 +42,6 @@ unless File.respond_to?(:write)
   end
 end
 
-# Hack Debian PATH
-ENV['PATH'] = ENV['PATH'] + ':/sbin:/usr/sbin'
 
 # Helper methods
 # --------------
