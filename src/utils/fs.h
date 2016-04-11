@@ -62,7 +62,16 @@ namespace fs {
      * Typically, it is "/proc/mounts" ("/etc/mtab")
      */
     extern const char * const MOUNTS_PATH;
+
+    /**
+     * Typically /proc
+     */
     extern const char * const PROC_PATH;
+
+    /**
+     * Typically /var/run/netns
+     */
+    extern const char * const NETNS_PATH;
 
     /**
      * Cgroup filesystem type name: "cgroup"

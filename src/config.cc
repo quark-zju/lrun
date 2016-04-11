@@ -47,6 +47,7 @@ MainConfig::MainConfig() {
     this->active_cgroup = NULL;
     this->pass_exitcode = false;
     this->write_result_to_3 = fs::is_accessible("/proc/self/fd/3", F_OK);
+    this->netns = "";
 
     // arg settings
     this->arg.nice = 0;
@@ -60,6 +61,7 @@ MainConfig::MainConfig() {
     this->arg.no_new_privs = true;
     this->arg.umount_outside = false;
     this->arg.clone_flags = 0;
+    this->arg.netns_fd = -1;
     this->arg.stdout_fd = STDOUT_FILENO;
     this->arg.stderr_fd = STDERR_FILENO;
     this->arg.callback_child = NULL;
@@ -142,6 +144,14 @@ void MainConfig::check() {
                 "Use `--help` to see full options.");
     }
 
+    if (!this->netns.empty()) {
+        if (!this->enable_network) {
+            error_messages.push_back(
+                    "`--network false` and `--netns` cannot be used together.");
+        }
+        check_path_permission(fs::join(fs::NETNS_PATH, this->netns), error_messages);
+    }
+
     if (!is_root) {
         if (this->arg.cmd_list.size() > 0) {
             error_messages.push_back(
@@ -151,6 +161,11 @@ void MainConfig::check() {
         if (this->groups.size() > 0) {
             error_messages.push_back(
                     "For security reason, `--group` requires root.");
+        }
+
+        if (!this->netns.empty() && this->netns.substr(0, 5) != "lrun-") {
+            error_messages.push_back(
+                    "For security reason, `--netns` name should start with `lrun-`.");
         }
 
         // check paths, require absolute paths and read permissions

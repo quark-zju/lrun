@@ -95,6 +95,7 @@ static string help_content(int width) {
         "  --remount-dev     bool        Remount /dev and create only basic device files in it (see --basic-device)\n"
         "  --reset-env       bool        Clean environment variables\n"
         "  --network         bool        Whether network access is permitted\n"
+        "  --netns           name        The name of network namespace to use. They can be created by `ip netns`. For non-root users, the name must start with `lrun-`\n"
         "  --pass-exitcode   bool        Discard lrun exit code, pass child process's exit code\n"
         "  --chroot          path        Chroot to specified `path` before exec\n"
         "  --umount-outside  bool        Umount everything outside the chroot path. This is not necessary but can help to hide mount information. Note: umount is SLOW\n"

@@ -115,6 +115,14 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
         } else if (option == "network") {
             REQUIRE_NARGV(1);
             config.enable_network = NEXT_BOOL_ARG;
+        } else if (option == "netns") {
+            REQUIRE_NARGV(1);
+            config.netns = NEXT_STRING_ARG;
+            // prepare the fd in advance
+            config.arg.netns_fd = open(fs::join(fs::NETNS_PATH, config.netns).c_str(), O_RDONLY | O_CLOEXEC);
+            if (config.arg.netns_fd == -1) {
+                FATAL("cannot read %s netns", config.netns.c_str());
+            }
         } else if (option == "pass-exitcode") {
             REQUIRE_NARGV(1);
             config.pass_exitcode = NEXT_BOOL_ARG;

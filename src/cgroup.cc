@@ -644,6 +644,17 @@ static void do_set_uts(const Cgroup::spawn_arg& arg) {
     // [[[end]]]
 }
 
+static void do_set_netns(const Cgroup::spawn_arg& arg) {
+    if (arg.netns_fd == -1) return;
+
+    INFO("set net ns")
+
+    // older glibc does not have setns
+    if (syscall(SYS_setns, arg.netns_fd, CLONE_NEWNET)) {
+        FATAL("can not set netns");
+    };
+}
+
 static void do_fd_redirect(int fd_dst, int fd_src) {
     if (fd_src >= 0 && fd_src != fd_dst) {
         INFO("dup2 %d %d", fd_src, fd_dst);
@@ -946,6 +957,7 @@ static int clone_main_fn(void * clone_arg) {
     do_set_sysctl();
 #endif
     do_set_uts(arg);
+    do_set_netns(arg);
     do_process_fds(arg);
     do_privatize_filesystem(arg);
     do_umount_outside_chroot(arg);

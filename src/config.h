@@ -42,6 +42,7 @@ namespace lrun {
         bool write_result_to_3;
         useconds_t interval;
         std::string cgname;
+        std::string netns;  // compatible with "ip netns"
         Cgroup* active_cgroup;
 
         std::vector<gid_t> groups;

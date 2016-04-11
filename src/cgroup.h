@@ -288,6 +288,7 @@ namespace lrun {
                 std::string syscall_list;   // syscall whitelist or blacklist
                 int stdout_fd;              // redirect stdout to
                 int stderr_fd;              // redirect stderr to
+                int netns_fd;               // netns fd
                 struct {                    // set uts namespace strings
                     std::string sysname;
                     std::string nodename;

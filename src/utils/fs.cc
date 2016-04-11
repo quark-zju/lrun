@@ -43,6 +43,7 @@ using std::string;
 const char fs::PATH_SEPARATOR = '/';
 const char * const fs::PROC_PATH = "/proc";
 const char * const fs::MOUNTS_PATH = "/proc/mounts";
+const char * const fs::NETNS_PATH = "/var/run/netns";
 const char * const fs::TYPE_CGROUP = "cgroup";
 const char * const fs::TYPE_TMPFS  = "tmpfs";
 
