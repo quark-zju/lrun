@@ -254,3 +254,8 @@ You are probably using Debian. File-open filter requires the kernel to be compil
 *dmesg prints @trap ... ip:... sp:... in ...@ and I don't want to see them*
 
 Try @sysctl -w debug.exception-trace=0@.
+
+h2. License
+
+I am providing code in this repository to you under the MIT license (see LICENSE for details).
+Because this is my personal repository, the license you receive to my code is from me and not from my previous employer(s) or current employer.
