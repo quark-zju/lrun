@@ -8,6 +8,7 @@
 test/[a-z_]*
 src/lrun
 tools/mirrorfs/mirrorfs
+tools/netns-empty/netns-empty
 *.so
 
 # include sources

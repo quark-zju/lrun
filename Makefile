@@ -2,11 +2,13 @@
 
 default:
 	cd src && rake
-	cd tools/mirrorfs && make
+	make -C tools/mirrorfs
+	make -C tools/netns-empty
 
 install:
 	cd src && rake install
-	cd tools/mirrorfs && make install
+	make install -C tools/mirrorfs
+	make install -C tools/netns-empty
 
 clean:
 	cd src && rake clean

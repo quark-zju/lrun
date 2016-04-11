@@ -1,0 +1,6 @@
+A simple tool to manage an empty network namespace for lrun.
+
+    lrun-netns-empty create   # equivalent to "ip netns add lrun-empty"
+    lrun-netns-empty destroy  # equivalent to "ip netns del lrun-empty"
+    lrun-netns-empty status   # show status of the namespace
+    lrun-netns-empty help     # show help
