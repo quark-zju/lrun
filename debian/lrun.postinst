@@ -18,6 +18,10 @@ case "${1}" in
 			chown root:lrun /usr/bin/lrun-mirrorfs
 			chmod 4550 /usr/bin/lrun-mirrorfs
 		fi
+		if ! dpkg-statoverride --list /usr/bin/lrun-netns-empty; then
+			chown root:lrun /usr/bin/lrun-netns-empty
+			chmod 4550 /usr/bin/lrun-netns-empty
+		fi
 		;;
 
 	abort-upgrade|abort-remove|abort-deconfigure)
