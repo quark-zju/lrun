@@ -7,7 +7,7 @@
 # no binaries
 test/[a-z_]*
 src/lrun
-utils/mirrorfs/mirrorfs
+tools/mirrorfs/mirrorfs
 *.so
 
 # include sources

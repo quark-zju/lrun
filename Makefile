@@ -2,10 +2,11 @@
 
 default:
 	cd src && rake
+	cd tools/mirrorfs && make
 
 install:
 	cd src && rake install
-	cd utils/mirrorfs && make install
+	cd tools/mirrorfs && make install
 
 clean:
 	cd src && rake clean
