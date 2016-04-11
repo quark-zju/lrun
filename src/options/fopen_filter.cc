@@ -34,10 +34,10 @@
 #include "options.h"
 #include "../utils/ensure.h"
 #include "../utils/fs.h"
-#include "../utils/fs_tracer.h"
 #include "../utils/log.h"
 #include "../utils/re.h"
 #include "../config.h"
+#include "../fs_tracer.h"
 
 
 static pid_t tracer_pid;

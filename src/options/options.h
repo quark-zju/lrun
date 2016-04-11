@@ -25,7 +25,7 @@
 #include <string>
 #include "../config.h"
 #include "../cgroup.h"
-#include "../utils/fs_tracer.h"
+#include "../fs_tracer.h"
 
 namespace lrun {
     namespace options {
