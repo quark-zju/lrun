@@ -36,6 +36,12 @@ static int check_fd(int fd) {
     };
 }
 
+static bool set_netns_fd(lrun::MainConfig& config, const string& name) {
+    int fd = open(fs::join(fs::NETNS_PATH, name).c_str(), O_RDONLY | O_CLOEXEC);
+    config.arg.netns_fd = fd;
+    return fd != -1;
+}
+
 void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
     config.arg.args = argv + 1;
     config.arg.argc = argc - 1;
@@ -114,15 +120,26 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
             config.arg.reset_env = (int)NEXT_BOOL_ARG;
         } else if (option == "network") {
             REQUIRE_NARGV(1);
-            config.enable_network = NEXT_BOOL_ARG;
+            bool enabled = NEXT_BOOL_ARG;
+            if (!enabled) {
+                const char NETNS_EMPTY[] = "lrun-empty";
+                // replace `--network false` with `--netns #{NETNS_EMPTY}` if possible.
+                // NETNS_EMPTY can be created by the netns-empty tool. See tools/netns-empty.
+                // `--network false` may have performance issues: clone() with CLONE_NEWNET ->
+                // copy_net_ns() which will hold a global mutex in kernel.
+                if (set_netns_fd(config, NETNS_EMPTY)) {
+                    INFO("replaced `--network false` with `--netns %s`", NETNS_EMPTY);
+                    enabled = true;
+                }
+            }
+            config.enable_network = enabled;
         } else if (option == "netns") {
             REQUIRE_NARGV(1);
-            config.netns = NEXT_STRING_ARG;
-            // prepare the fd in advance
-            config.arg.netns_fd = open(fs::join(fs::NETNS_PATH, config.netns).c_str(), O_RDONLY | O_CLOEXEC);
-            if (config.arg.netns_fd == -1) {
-                FATAL("cannot read %s netns", config.netns.c_str());
+            string name = NEXT_STRING_ARG;
+            if (!set_netns_fd(config, name)) {
+                FATAL("cannot read %s netns", name.c_str());
             }
+            config.netns = name;
         } else if (option == "pass-exitcode") {
             REQUIRE_NARGV(1);
             config.pass_exitcode = NEXT_BOOL_ARG;

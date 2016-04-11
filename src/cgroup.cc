@@ -647,7 +647,7 @@ static void do_set_uts(const Cgroup::spawn_arg& arg) {
 static void do_set_netns(const Cgroup::spawn_arg& arg) {
     if (arg.netns_fd == -1) return;
 
-    INFO("set net ns")
+    INFO("set netns")
 
     // older glibc does not have setns
     if (syscall(SYS_setns, arg.netns_fd, CLONE_NEWNET)) {
