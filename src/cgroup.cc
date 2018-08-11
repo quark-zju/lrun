@@ -1065,7 +1065,9 @@ static string clone_flags_to_str(int clone_flags) {
     TEST_FLAG(SIGIO);
     TEST_FLAG(SIGPWR);
     TEST_FLAG(SIGSYS);
+#ifdef SIGUNUSED
     TEST_FLAG(SIGUNUSED);
+#endif
 #undef TEST_FLAG
     if (v) {
         s += strconv::from_long((long)v);
