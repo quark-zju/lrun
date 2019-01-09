@@ -165,6 +165,7 @@ rule '.o' => '.cc' do |t|
            try_cxxflags(['--param=ssp-buffer-size=4'], '--param=ssp-buffer-size'),
            try_cxxflags(['-D_FORTIFY_SOURCE=2'], '-D_FORTIFY_SOURCE'),
            try_cxxflags(['-Os'], '-O'),
+           '-fPIC',
            CXXFLAGS, NODEBUG_FLAG, NOLIBSF_FLAG,
            "-DLIBSECCOMP_VERSION_MAJOR=#{get_libseccomp_version}",
            "-DVERSION=\\\"#{get_version}\\\"",

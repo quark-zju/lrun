@@ -1,5 +1,5 @@
 CXX?=g++
-CXXFLAGS?=-O2 -Wall
+CXXFLAGS?=-O2 -Wall -fPIC
 LRUN_GROUP?=lrun
 INSTALL?=install
 
