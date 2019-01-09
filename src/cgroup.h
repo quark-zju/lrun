@@ -227,6 +227,13 @@ namespace lrun {
             long long memory_limit() const;
 
             /**
+             * test if the cgroup is under OOM
+             * @return  true   if under OOM
+             *          false  otherwise
+             */
+            bool is_under_oom() const;
+
+            /**
              * get cpu usage
              * @return  cpu usage in seconds
              */

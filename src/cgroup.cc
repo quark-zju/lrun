@@ -422,6 +422,12 @@ long long Cgroup::memory_limit() const {
     return strconv::to_longlong(limit);
 }
 
+bool Cgroup::is_under_oom() const {
+    string content = get(CG_MEMORY, "memory.oom_control");
+    return content.find("under_oom 1") != string::npos;
+
+}
+
 long long Cgroup::set_memory_limit(long long bytes) {
     int e = 1;
 

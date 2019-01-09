@@ -319,7 +319,11 @@ static int run_command() {
         }
 
         // check memory limit
-        if (cg.memory_peak() >= config.memory_limit && config.memory_limit > 0) {
+        if (cg.is_under_oom()) {
+            INFO("OOM detected");
+            exceeded_limit = "MEMORY";
+            break;
+        } else if (cg.memory_peak() >= config.memory_limit && config.memory_limit > 0) {
             exceeded_limit = "MEMORY";
             break;
         }
