@@ -64,8 +64,9 @@ void fs::Tracer::process_events() {
                 char path[4096];
                 path[0] = '\0';
                 if (metadata->fd >= 0) {
-                    sprintf(path, "/proc/self/fd/%d", metadata->fd);
-                    ssize_t path_len = readlink(path, path, sizeof(path) - 1);
+                    char pathin[4096];
+                    sprintf(pathin, "/proc/self/fd/%d", metadata->fd);
+                    ssize_t path_len = readlink(pathin, path, sizeof(path) - 1);
                     if (path_len >= 0) path[path_len] = '\0';
                 }
                 cb_ret = cb_(path, metadata->fd, metadata->pid, metadata->mask);

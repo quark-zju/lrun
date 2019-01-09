@@ -156,8 +156,10 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
             switch (syscalls.data()[0]) {
                 case '!': case '-':
                     config.arg.syscall_action = seccomp::action_t::OTHERS_EPERM;
-                    /* intended no break */
-                case '=': case '+':
+                    /* fallthrough */
+                case '=':
+                    /* fallthrough */
+                case '+':
                     config.arg.syscall_list = string(syscalls.data() + 1);
                     break;
                 default:

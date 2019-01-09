@@ -322,6 +322,7 @@ void lrun::options::fopen_filter(const std::string& condition, const std::string
                         is_path = 0;
                         continue;
                     }
+                    /* fallthrough */
                 default:
                     if (is_path) path += content[i];
                     else regexp += content[i];

@@ -67,11 +67,19 @@ long long strconv::to_bytes(const string& str) {
     if (pos > 0 && (str[pos] == 'b' || str[pos] == 'B')) --pos;
     if (pos > 0) {
         switch (str[pos]) {
-            case 'g': case 'G':
+            case 'g':
+                /* fallthrough */
+            case 'G':
                 result *= 1024;
-            case 'm': case 'M':
+                /* fallthrough */
+            case 'm':
+                /* fallthrough */
+            case 'M':
                 result *= 1024;
-            case 'k': case 'K':
+                /* fallthrough */
+            case 'k':
+                /* fallthrough */
+            case 'K':
                 result *= 1024;
         }
     }
