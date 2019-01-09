@@ -1,3 +1,12 @@
+lrun (1.2.0) unstable; urgency=low
+
+  * Memory limit that is not a multiple of the page size works more reliably.
+  * The dummy init process won't be leaked in some cases.
+  * Fix compilation under modern compilers.
+  * Minor help text and debug message improvements.
+
+ -- Jun Wu <quark@lihdd.net>  Wed, 9 Jan 2018 22:56:00 +0800
+
 lrun (1.1.4) unstable; urgency=low
 
   * lrun-mirrorfs: support touch.
