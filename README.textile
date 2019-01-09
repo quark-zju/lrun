@@ -13,16 +13,16 @@ h3. Runtime dependencies
 
 h3. Build dependencies
 
-* *rake*: process Rakefile.
-* *g++*: g++ 4.6 and above recommended, 4.4 should work as well. Or clang++
-* *install*: install binaries.
-* *pkg-config*: (optional) get information about libseccomp.
-* *git*: (optional) get version information.
+* *rake*: The main lrun binary requires `Rakefile` to build.
+* *g++*: The code is in C++. g++ 4.6 and above is recommended. g++ 4.4 or clang++ should work as well.
+* *install*: To install binaries.
+* *pkg-config*: Get information about libseccomp (optional, but recommended).
+* *git*: Extract version information (optional, but recommended).
 
 h3. Installation dependencies
 
-* *groupadd*: create @lrun@ group.
-* *sudo*: (optional) install via a non-root user.
+* *groupadd*: Create the @lrun@ group.
+* *sudo*: Install via a non-root user (optional).
 
 h2. Installation
 
@@ -34,22 +34,22 @@ make install  # or: cd src && rake install
 
 h4. Configuration
 
-@lrun@ does not have any config files. However, non-root users must be added to @lrun@ group to be able to run @lrun@:
+@lrun@ does not have any config files. However, non-root users must be added to the @lrun@ group before being able to run @lrun@:
 
 <pre>
 gpasswd -a username lrun
 </pre>
 
-Note: On Linux <= 3.5, if sudo is installed, a user in lrun group can use lrun for privilege escalation.
+Note: On Linux <= 3.5, if `sudo` is installed, a user in lrun group can use lrun for privilege escalation.
 
 h4. Build options
 
 There are several environment variables which can affect building process:
 
 * *PREFIX*: Install destination. Default is @/usr/local@.
-* *CXX*: The C++ compiler. For example, @clang++@ or @g++@
-* *CXXFLAGS*: Flags used for C++ compiler. Default is @-O2 -Wall@
-* *INSTALL*: @install@ binary.
+* *CXX*: The C++ compiler. For example, @clang++@ or @g++@.
+* *CXXFLAGS*: Flags used for C++ compiler. Default is @-O2 -Wall@.
+* *INSTALL*: The @install@ binary.
 * *LRUN_GROUP*: The group which have access to run lrun directly. Default is @lrun@.
 * *NDEBUG*: If set, remove some debug code and produce smaller executable.
 * *NOSECCOMP*: If set, always build without libseccomp support.
@@ -69,7 +69,7 @@ h2. Usage
 
 h2. Output Format
 
-lrun writes its final output to fd 3. This makes it easier for you to pass @stdin@, @stdout@, @stderr@ to the child process. If lrun runs successfully, its fd 3 output is like (@#@ starts a comment), which is pretty self-explanatory:
+lrun writes its final output to fd 3. This makes it easier to pass @stdin@, @stdout@, @stderr@ directly to the child process. If the child process gets executed, fd 3 output looks like below (without @#@ comments):
 
 <pre>
 MEMORY   int         # in bytes
@@ -78,8 +78,10 @@ REALTIME float       # in seconds
 SIGNALED int         # one of: 0, 1. 1 means the process is signaled (exit abnormally)
 EXITCODE int         # exit code
 TERMSIG  int         # signal number, 0 if not signaled
-EXCEED   excced_enum # one of: none, CPU_TIME, REAL_TIME, MEMORY, OUTPUT
+EXCEED   exceed_enum # one of: none, CPU_TIME, REAL_TIME, MEMORY, OUTPUT
 </pre>
+
+If the child process does not get executed (ex. the path does not exist), nothing will be written to fd 3.
 
 
 h2. Examples
@@ -183,7 +185,7 @@ TERMSIG  0
 EXCEED   none
 </pre>
 
-There is also @--bindfs@. Non-root users can only mount A to B if he or she can read A.
+There is also @--bindfs@. Non-root users can only mount A to B if they can read A.
 
 h3. Syscall filter
 
