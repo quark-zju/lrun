@@ -291,7 +291,9 @@ int Cgroup::empty() {
 }
 
 void Cgroup::killall(bool confirm) {
-    if (!valid() || empty()) return;
+    // The init pid can be outside the cgroup task list. Therefore do not
+    // test "empty()" here.
+    if (!valid()) return;
 
     if (init_pid_) {
         if (init_pid_ > 0) {
