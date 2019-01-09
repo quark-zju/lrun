@@ -347,6 +347,7 @@ int Cgroup::destroy() {
 }
 
 int Cgroup::set(subsys_id_t subsys_id, const string& property, const string& value) {
+    INFO("set cgroup %s/%s to %s", subsys_path(subsys_id).c_str(), property.c_str(), value.c_str());
     return fs::write(subsys_path(subsys_id) + "/" + property, value);
 }
 
@@ -421,7 +422,7 @@ long long Cgroup::memory_limit() const {
     return strconv::to_longlong(limit);
 }
 
-int Cgroup::set_memory_limit(long long bytes) {
+long long Cgroup::set_memory_limit(long long bytes) {
     int e = 1;
 
     if (bytes <= 0) {
@@ -433,7 +434,13 @@ int Cgroup::set_memory_limit(long long bytes) {
         e *= set(CG_MEMORY, "memory.memsw.limit_in_bytes", strconv::from_longlong(bytes));
     }
 
-    return e ? -1 : 0;
+    if (e) {
+        return -1;
+    } else {
+        // The kernel might "adjust" the memory limit. Read it back.
+        string limit = get(CG_MEMORY, "memory.memsw.limit_in_bytes");
+        return strconv::to_longlong(limit);
+    }
 }
 
 // following functions are called by clone_main_fn

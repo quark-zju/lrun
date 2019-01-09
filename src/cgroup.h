@@ -235,10 +235,10 @@ namespace lrun {
             /**
              * set memory usage limit
              * @param   bytes       limit, no limit if bytes <= 0
-             * @return  0           success
+             * @return >=0          success, real memory limit
              *         <0           failed
              */
-            int set_memory_limit(long long bytes);
+            long long set_memory_limit(long long bytes);
 
             /**
              * restart cpuacct and memory max_usage_in_bytes

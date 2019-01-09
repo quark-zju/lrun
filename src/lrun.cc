@@ -177,9 +177,15 @@ static void configure_cgroup() {
 
     // memory limits
     if (config.memory_limit > 0) {
-        if (cg.set_memory_limit(config.memory_limit)) {
+        long long real_limit = cg.set_memory_limit(config.memory_limit);
+        if (real_limit < 0) {
             ERROR("can not set memory limit");
             clean_cg_exit(cg, 2);
+        }
+
+        if (real_limit != config.memory_limit) {
+            INFO("memory limit adjusted to %lld", real_limit);
+            config.memory_limit = real_limit;
         }
     }
 
