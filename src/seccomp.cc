@@ -196,7 +196,7 @@ int sc::Rules::add_simple_filter(const char * const filter) {
                             // remove our execve from the condition
                             current_arg_array.push_back(SCMP_CMP(1, SCMP_CMP_NE, execve_arg1_, /* not used */ 0));
                         } else if (!current_arg_array.empty() || current_action != SCMP_ACT_ALLOW) {
-                            WARNING("can not guarntee execve by lrun is allowed");
+                            WARNING("can not guarantee execve by lrun is allowed");
                         }
                     }
                     ret = seccomp_rule_add_array(ctx, current_action, no, current_arg_array.size(), current_arg_array.data());
