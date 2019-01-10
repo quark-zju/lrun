@@ -121,17 +121,6 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
         } else if (option == "network") {
             REQUIRE_NARGV(1);
             bool enabled = NEXT_BOOL_ARG;
-            if (!enabled) {
-                const char NETNS_EMPTY[] = "lrun-empty";
-                // replace `--network false` with `--netns #{NETNS_EMPTY}` if possible.
-                // NETNS_EMPTY can be created by the netns-empty tool. See tools/netns-empty.
-                // `--network false` may have performance issues: clone() with CLONE_NEWNET ->
-                // copy_net_ns() which will hold a global mutex in kernel.
-                if (set_netns_fd(config, NETNS_EMPTY)) {
-                    INFO("replaced `--network false` with `--netns %s`", NETNS_EMPTY);
-                    enabled = true;
-                }
-            }
             config.enable_network = enabled;
         } else if (option == "netns") {
             REQUIRE_NARGV(1);
