@@ -78,6 +78,11 @@ sc::Rules::Rules(action_t default_action, uint64_t execve_arg1) {
     get_scmp_action(scmp_action_, scmp_action_inverse_, default_action);
     ctx = seccomp_init(scmp_action_);
     if (ctx == NULL) ERROR("seccomp_init");
+    // Allow x86 syscalls on x64 platforms
+    if (seccomp_arch_native() == SCMP_ARCH_X86_64 && seccomp_arch_exist(ctx, SCMP_ARCH_X86) == -EEXIST) {
+        int rc = seccomp_arch_add(ctx, SCMP_ARCH_X86);
+        if (rc != 0) ERROR("seccomp_arch_add");
+    }
 }
 
 // save parsed result to result and return string length
