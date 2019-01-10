@@ -151,19 +151,20 @@ TESTCASE(bad_progs) {
 
 TESTCASE(syscall_filter) {
     string create_userns_code =
-            "#define _GNU_SOURCE\n#include<sched.h>\n#include<stdio.h>\nint foo(void* a){return 0;}\n"
-            "main(a){char stack[8192];a=clone(foo, stack + sizeof(stack), CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWIPC, 0);exit(a>0?0:1);}";
-    // the following one may fail if the kernel has been patched and non-root users can not create user namespaces (ex. Debian)
+            "#define _GNU_SOURCE\n#include<sched.h>\n#include<stdio.h>\n#include<errno.h>\n"
+            "int foo(void* a){return 0;}\n"
+            "main(a){char stack[8192];a=clone(foo, stack + sizeof(stack), CLONE_FS, 0);exit(a>0?0:errno);}";
     test_c_code(create_userns_code, "EXITCODE 0");
 
-    test_c_code(create_userns_code, "EXITCODE 1", "--syscalls '!clone[a&268435456==268435456]'");
-    test_c_code(create_userns_code, "SIGNALED 1", "--syscalls '!clone[a&268435456==268435456]:k'");
+    // CLONE_FS = 0x00000200
+    test_c_code(create_userns_code, "EXITCODE 1", "--syscalls '!clone[a&512==512]'");
+    test_c_code(create_userns_code, "SIGNALED 1", "--syscalls '!clone[a&512==512]:k'");
 
     // test execve special case handling
     test_cmd("true", "EXITCODE 0", "--syscalls '!execve'");
-    test_cmd("true", "EXITCODE 0", "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,read,exit'");
+    test_cmd("true", "EXITCODE 0", "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,openat,read,exit'");
     test_cmd("true", "EXITCODE 0", "--syscalls '!execve:a'");
     test_cmd("true", "EXITCODE 0", "--syscalls '!open:a'");
     test_cmd("env true", "EXITCODE 1" /* 126 */, "--syscalls '!execve'");
-    test_cmd("env true", "EXITCODE 1" /* 125 */, "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,read,exit'");
+    test_cmd("env true", "EXITCODE 1" /* 125 */, "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,openat,read,exit'");
 }

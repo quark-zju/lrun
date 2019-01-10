@@ -21,7 +21,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "test.h"
-#include "utils/fs.h"
+#include "../src/utils/fs.h"
 #include <cstdlib>
 #include <errno.h>
 #include <unistd.h>
@@ -248,41 +248,4 @@ TESTCASE(is_dir) {
     CHECK(!fs::is_dir(""));
     CHECK(!fs::is_dir("/bin/bash"));
     CHECK(!fs::is_dir("/bin/ping"));
-}
-
-TESTCASE(path_node) {
-    fs::PathNode node;
-    CHECK(node.get("abcdef") == 0);
-    CHECK(node.get("/") == 0);
-    CHECK(node.get("") == 0);
-
-    node.set("/", 1, 1 /* wildcard */);
-    CHECK(node.get("abcdef") == 0);
-    CHECK(node.get("/") == 1);
-    CHECK(node.get("/a") == 1);
-
-    node.set("/bin", 2, 1);
-    node.set("/bin/ruby", 3, 1);
-    node.set("/bin/ruby2.0", 4, 0);
-    CHECK(node.get("/bin/lua") == 2);
-    CHECK(node.get("/bin/ruby") == 3);
-    CHECK(node.get("/bin/ruby1.9") == 3);
-    CHECK(node.get("/bin/ruby2.0") == 4);
-    CHECK(node.get("/bin/ruby2.1") == 3);
-
-    node.set("/proc/self/fd/3", 8, 0);
-    node.set("/proc/self/fd", 5, 1);
-    node.set("/proc/self/stat", 9, 0);
-    node.set("/proc", 6, 1);
-    node.set("/proc/self/fd/2", 7, 1);
-    CHECK(node.get("/proc") == 6);
-    CHECK(node.get("/proc/self") == 6);
-    CHECK(node.get("/proc/self/fd") == 5);
-    CHECK(node.get("/proc/self/fd/1") == 5);
-    CHECK(node.get("/proc/self/stat") == 9);
-    CHECK(node.get("/proc/self/status") == 6);
-    CHECK(node.get("/proc/self/fd/2") == 7);
-    CHECK(node.get("/proc/self/fd/3") == 8);
-    CHECK(node.get("/proc/self/fd/21") == 7);
-    CHECK(node.get("/proc/self/fd/31") == 5);
 }
