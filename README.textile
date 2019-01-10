@@ -143,6 +143,8 @@ h3. Restrict network
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 </pre>
 
+Note: On some kernels, creating an empty network namespace takes a global lock and can hurt parallelism. To workaround that, run `lrun-netns-empty --create` or `sudo ip netns add lrun-empty` once per reboot. They will create an empty `lrun-empty` namespace, and `--network false` will be replaced by `--netns lrun-empty` automatically.
+
 h3. Isolate processes
 
 <pre>
