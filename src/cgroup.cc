@@ -805,7 +805,7 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
         if (resource == RLIMIT_CPU || resource == RLIMIT_FSIZE) ++limit.rlim_max;
 
         DEBUG_DO {
-            char limit_name[16];
+            char limit_name[18];
             switch (resource) {
 #define CONVERT_NAME(x) case x: strncpy(limit_name, # x, sizeof(limit_name)); break;
                 CONVERT_NAME(RLIMIT_CPU);
